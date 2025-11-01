@@ -1,56 +1,39 @@
-from fastapi import APIRouter, Path, Query, Body
+from fastapi import APIRouter, Path, Query, Body, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel, HttpUrl, field_validator
-from app.models import User
+import app.schemas as schemas
+from sqlalchemy.orm import Session
+from app.dependencies import SessionDep
+import app.crud as crud
+
 
 router = APIRouter()
 
-class Item(BaseModel):
-    name: str
-    description: Optional[str] = None
-    price: float
-    tax: Optional[float] = None
-
-
-@router.get("/items/")
-async def read_items(skip: int = 0, limit: int = 10, q: Optional[str] = None):
-    results = {"skip": skip, "limit": limit}
-    if q:
-        results.update({"q": q})
-    return results
-
-@router.get("/items/{item_id}")
-async def read_item(
-    item_id: int = Path(..., title="ID del item", ge=1),  # item_id must be greater than or equal to 1
-    q: Optional[str] = Query(None, min_length=3, max_length=50),  # q is an optional query parameter with max length 50
-    size: Optional[float] = Query(None, gt=0, lt=100)  # size must be greater than 0 and less than 1000
+@router.post("/users/{user_id}/items/", response_model=schemas.Item)
+async def create_item_for_user(
+    db: SessionDep, user_id: int, item: schemas.ItemCreate,
 ):
-    results = {"item_id": item_id}
-    if q:
-        results.update({"q": q})
-    if size:
-        results.update({"size": size})
-    return results
+    db_user = crud.get_user(db, user_id=user_id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return crud.create_user_item(db=db, item=item, user_id=user_id)
 
-@router.put("/items/{item_id}")
-async def update_item(
-    item_id: int, 
-    item: Item = Body(
-        ..., 
-        example={
-            "name": "Smartphone",
-            "description": "A brand new smartphone",
-            "price": 699.99,
-            "tax": 59.99
-        }
-    )
-):
-    return {"item_id": item_id, "item": item}
+@router.get("/items/", response_model=List[schemas.Item])
+async def read_items(db: SessionDep, skip: int = 0, limit: int = 10):
+    items = crud.get_items(db, skip=skip, limit=limit)
+    return items
 
-@router.post("/items/{item_id}")
-async def create_item(item_id: int, item: Item, user: User):
-    return {"item_id": item_id, "item": item, "user": user}
+
+@router.put("/items/{item_id}", response_model=schemas.Item)
+async def update_item(db: SessionDep, item_id: int, item: schemas.Item):    
+    db_item = crud.update_item(db, item_id=item_id, item=item)
+    if db_item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return db_item
 
 @router.delete("/items/{item_id}")
-async def delete_item(item_id: int):
-    return {"item_id": item_id, "deleted": True}
+async def delete_item(db: SessionDep, item_id: int):
+    success = crud.delete_item(db, item_id=item_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"detail": "Item deleted successfully"}
