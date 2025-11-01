@@ -3,10 +3,10 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, EmailStr, HttpUrl, field_validator
 import re
 from app.api import users, items
-import app.model as model
+import app.models as models
 from .database import engine
 
-model.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title = "App ArtTerapia", 
