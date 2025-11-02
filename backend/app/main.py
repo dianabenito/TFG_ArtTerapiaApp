@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 from pydantic import BaseModel, Field, EmailStr, HttpUrl, field_validator
 import re
-from app.api import users, items
+from app.api import users, items, comfy
 import app.models as models
 from .database import engine
 
@@ -28,6 +28,7 @@ app.add_middleware(
 
 app.include_router(items.router, prefix="/items", tags=["items"])
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(comfy.router, prefix="/comfy", tags=["comfy"])
 
 @app.get("/")
 async def root():
