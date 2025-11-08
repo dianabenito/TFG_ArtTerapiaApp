@@ -27,7 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Asegurar que la carpeta de imágenes existe
 images_path = os.path.abspath("../frontend/src/assets/generated_images")
+os.makedirs(images_path, exist_ok=True)
 app.mount("/images", StaticFiles(directory=images_path), name="images")
 
 app.include_router(items.router, prefix="/items", tags=["items"])
