@@ -1,8 +1,9 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 from pydantic import BaseModel, Field, EmailStr, HttpUrl, field_validator
-import re
+import re, os
 from app.api import users, items, comfy
 import app.models as models
 from .database import engine
@@ -25,6 +26,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Asegurar que la carpeta de imágenes existe
+images_path = os.path.abspath("../frontend/src/assets/generated_images")
+os.makedirs(images_path, exist_ok=True)
+app.mount("/images", StaticFiles(directory=images_path), name="images")
 
 app.include_router(items.router, prefix="/items", tags=["items"])
 app.include_router(users.router, prefix="/users", tags=["users"])
