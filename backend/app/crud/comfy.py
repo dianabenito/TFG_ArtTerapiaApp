@@ -4,5 +4,10 @@ import app.models as models
 import app.schemas as schemas
 import app.services as services
 
-def create_image(promptText: str):
-    return services.image_generation.generar_imagen(promptText)
+def create_user_image(db: Session, prompt: schemas.Prompt, user_id: int):
+    image = services.image_generation.generar_imagen(prompt.promptText)
+    db_image = models.Image(fileName=image["file"], owner_id=user_id)
+    db.add(db_image)
+    db.commit()
+    db.refresh(db_image)
+    return image
