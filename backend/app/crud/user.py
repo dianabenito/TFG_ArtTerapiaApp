@@ -16,8 +16,16 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
+    # validate requested type: only patient or therapist allowed
+    if not hasattr(user, 'type') or user.type not in (schemas.UserType.patient, schemas.UserType.therapist):
+        raise HTTPException(status_code=400, detail="Invalid or missing user type; must be 'patient' or 'therapist'")
+
     fake_hashed_password = user.password + "notreallyhashed"
-    db_user = models.User(email=user.email, hashed_password=fake_hashed_password)
+    # create appropriate subtype
+    if user.type == schemas.UserType.patient:
+        db_user = models.Patient(email=user.email, hashed_password=fake_hashed_password)
+    else:
+        db_user = models.Therapist(email=user.email, hashed_password=fake_hashed_password)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
