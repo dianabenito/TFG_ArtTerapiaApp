@@ -55,6 +55,20 @@ class Image(Base):
     id = Column(Integer, primary_key=True, index=True)
     fileName = Column(String, nullable=False)
     owner_id = Column(Integer, ForeignKey("users.id"))
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=True)
 
     owner = relationship("Patient", back_populates="images") # One item belongs to one user
+    session = relationship("Session", back_populates="images") # One item belongs to one user
 
+
+class Session(Base):
+    __tablename__ = "sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    therapist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    patient = relationship("Patient", foreign_keys=[patient_id])
+    therapist = relationship("Therapist", foreign_keys=[therapist_id])
+    images = relationship("Image", back_populates="session")

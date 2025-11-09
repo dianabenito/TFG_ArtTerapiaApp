@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 from pydantic import BaseModel, Field, EmailStr, HttpUrl, field_validator
 import re, os
-from app.api import users, items, comfy
+from app.api import users, items, comfy, ws, sessions
 import app.models as models
 from .database import engine
 
@@ -35,6 +35,8 @@ app.mount("/images", StaticFiles(directory=images_path), name="images")
 app.include_router(items.router, prefix="/items", tags=["items"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(comfy.router, prefix="/comfy", tags=["comfy"])
+app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
+app.include_router(ws.router, tags=["websocket"])
 
 @app.get("/")
 async def root():
