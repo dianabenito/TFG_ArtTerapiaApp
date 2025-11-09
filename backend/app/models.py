@@ -13,6 +13,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     items = relationship("Item", back_populates="owner") # One user can have many items
+    images = relationship("Image", back_populates="owner") # One user can have many items
 
 class Item(Base):
     __tablename__ = "items"
@@ -23,3 +24,13 @@ class Item(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="items") # One item belongs to one user
+
+class Image(Base):
+    __tablename__ = "images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fileName = Column(String, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    owner = relationship("User", back_populates="images") # One item belongs to one user
+
