@@ -25,3 +25,7 @@ async def create_user(db: SessionDep, user: schemas.UserCreate):
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud.user.create_user(db=db, user=user)
+
+@router.post("/login")
+async def login(db: SessionDep, user_data: schemas.UserLogin):
+    return crud.user.login_user(db=db, email=user_data.email, password=user_data.password)

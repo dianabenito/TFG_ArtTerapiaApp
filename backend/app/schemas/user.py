@@ -14,8 +14,11 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    # Require explicit type: patient or therapist
     type: UserType
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
 class User(UserBase):
     id: int
@@ -25,4 +28,3 @@ class User(UserBase):
     items: List[Item] = []
     class Config:
         orm_mode = True
-
