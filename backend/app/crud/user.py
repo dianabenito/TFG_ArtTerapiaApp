@@ -48,7 +48,7 @@ def login_user(db: Session, email: str, password: str):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    access_token = create_access_token({"sub": str(user.id)})
+    access_token = create_access_token({"sub": str(user.id),  "user_type": user.type})
     return {"access_token": access_token, "token_type": "bearer"}
 
 def validate_password_strength(password: str):

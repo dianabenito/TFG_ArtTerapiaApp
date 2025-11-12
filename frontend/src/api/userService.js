@@ -13,4 +13,17 @@ export const userService = {
     return response.data
   },
 
+  async login(credentials) {
+    // credentials = { email, password }
+    const response = await axios.post(`${API_URL}/users/login`, credentials)
+    const token = response.data.access_token
+    if (token) {
+      localStorage.setItem('token', token)
+      localStorage.setItem('userType', response.data.user_type)
+    }
+    return response.data
+  },
+
 }
+
+
