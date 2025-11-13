@@ -1,21 +1,76 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { comfyService } from '../api/comfyService'
+import { userService } from '../api/userService.js'
 
+import { useRoute } from 'vue-router'
 const API_URL = 'http://127.0.0.1:8000'
-const sessionId = 1 // sesión activa
+const route = useRoute()
+const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
 const role = 'patient'
 
-const prompt = ref({promptText: ''})
+const prompt = ref({ promptText: '' })
 const imageUrl = ref('')
 const isLoading = ref(false)
+const sessionInfo = ref(null)
 
-let ws
+let ws = null
 
-onMounted(() => {
-  // connect using the server route: /ws/{session_id}/{role}
-  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}`)
+const connectWs = () => {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    console.warn('No token found; websocket will not connect')
+    return
+  }
+
+  if (!Number.isFinite(sessionId)) {
+    console.warn('sessionId no válido en la ruta; websocket no se conectará')
+    return
+  }
+
+  // no conectar si sesión ya finalizada
+  if (sessionInfo.value?.ended_at) {
+    console.warn('La sesión ya está finalizada; no se conectará al websocket')
+    return
+  }
+
+  // incluir token en query param para que el servidor lo valide
+  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
+
+  ws.onopen = () => console.log('WS conectado como paciente')
+  ws.onmessage = (ev) => {
+    try {
+      const obj = JSON.parse(ev.data)
+      console.log('WS message (obj):', obj)
+    } catch (e) {
+      // manejar mensaje plain text
+      const txt = String(ev.data)
+      if (txt === 'session_ended') {
+        // actualizar estado local
+        sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
+        ws?.close()
+        return
+      }
+      console.log('WS message:', ev.data)
+    }
+  }
+  ws.onclose = () => console.log('WS cerrado')
+}
+
+onMounted(async () => {
+  // obtener info de sesión
+  if (Number.isFinite(sessionId)) {
+    try {
+      sessionInfo.value = await userService.getSession(sessionId)
+    } catch (err) {
+      console.warn('No se pudo obtener la sesión:', err)
+    }
+  }
+
+  connectWs()
 })
+
+onBeforeUnmount(() => ws?.close())
 
 const generateImage = async () => {
   try {
@@ -33,6 +88,10 @@ const generateImage = async () => {
 // Enviar la imagen al terapeuta
 const submitImage = () => {
   if (!imageUrl.value) return
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn('WebSocket no está abierto')
+    return
+  }
   ws.send(JSON.stringify({
     event: 'submit_image',
     fileName: imageUrl.value.split('/').pop()
@@ -43,6 +102,11 @@ const submitImage = () => {
 <template>
   <div>
     <h1>Generar imagen con ComfyUI</h1>
+
+    <div v-if="sessionInfo">
+      <p><strong>Sesión ID:</strong> {{ sessionInfo.id }}</p>
+      <p><strong>Estado:</strong> {{ sessionInfo.ended_at ? 'Finalizada' : 'Activa' }}</p>
+    </div>
     <input v-model="prompt.promptText" type="text" placeholder="Describe tu imagen" />
     <button @click="generateImage" :disabled="isLoading">
       {{ isLoading ? 'Generando...' : 'Generar' }}

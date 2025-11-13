@@ -7,6 +7,7 @@ const router = useRouter()
 const user = ref(null)
 const loading = ref(true)
 const errorMsg = ref('')
+const activeSession = ref(null)
 
 onMounted(async () => {
   try {
@@ -15,12 +16,23 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error al obtener el usuario:', error)
     errorMsg.value = error.response?.data?.detail || 'No autenticado'
-    // if unauthorized, redirect to login (optional)
-    // router.push('/login')
+  }
+
+  // obtener sesión activa (si existe)
+  try {
+    activeSession.value = await userService.getActiveSession()
+    console.log('Active session:', activeSession.value)
+  } catch (e) {
+    activeSession.value = null
   } finally {
     loading.value = false
   }
 })
+
+const logout = () => {
+  userService.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -37,6 +49,17 @@ onMounted(async () => {
         <p>No has iniciado sesión.</p>
         <p>{{ errorMsg }}</p>
         <router-link to="/login">Ir a iniciar sesión</router-link>
+      </div>
+
+      <div>
+        <button @click="logout">Cerrar sesión</button>
+      </div>
+
+      <div v-if="activeSession" style="margin-top:1rem">
+        <p class="muted">Tienes una sesión activa (ID: {{ activeSession.id }})</p>
+        <button v-if="user && user.type === 'patient' && !activeSession.ended_at" @click="() => router.push(`/session/${activeSession.id}/patient`)">Ir a mi sesión (Paciente)</button>
+        <button v-else-if="user && user.type === 'therapist' && !activeSession.ended_at" @click="() => router.push(`/session/${activeSession.id}/therapist`)">Ir a mi sesión (Terapeuta)</button>
+        <p v-else-if="activeSession.ended_at">La sesión está finalizada.</p>
       </div>
     </div>
   </div>
