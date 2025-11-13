@@ -37,6 +37,14 @@ export const userService = {
     return response.data
   },
 
+  async getActiveSession() {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/sessions/active`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
   async logout() {
     localStorage.removeItem('token')
   }

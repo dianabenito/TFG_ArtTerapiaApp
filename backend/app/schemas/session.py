@@ -1,15 +1,22 @@
 from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+
 
 class SessionBase(BaseModel):
-    pass
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
 
 class SessionCreate(SessionBase):
     pass
 
-class Session(BaseModel):
+
+class Session(SessionBase):
     id: int
     patient_id: int
     therapist_id: int
+
     class Config:
         orm_mode = True
     

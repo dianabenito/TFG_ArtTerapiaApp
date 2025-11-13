@@ -2,8 +2,10 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { comfyService } from '../api/comfyService'
 
+import { useRoute } from 'vue-router'
 const API_URL = 'http://127.0.0.1:8000'
-const sessionId = 2 // sesión activa (ajusta según tu flujo)
+const route = useRoute()
+const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
 const role = 'patient'
 
 const prompt = ref({ promptText: '' })
@@ -16,6 +18,11 @@ onMounted(() => {
   const token = localStorage.getItem('token')
   if (!token) {
     console.warn('No token found; websocket will not connect')
+    return
+  }
+
+  if (!Number.isFinite(sessionId)) {
+    console.warn('sessionId no válido en la ruta; websocket no se conectará')
     return
   }
 

@@ -68,6 +68,9 @@ class Session(Base):
     patient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     therapist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Period during which the session is active
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
 
     patient = relationship("Patient", foreign_keys=[patient_id])
     therapist = relationship("Therapist", foreign_keys=[therapist_id])

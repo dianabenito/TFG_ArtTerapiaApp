@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
+import { useRoute } from 'vue-router'
 const API_URL = 'http://127.0.0.1:8000'
-const sessionId = 2
+const route = useRoute()
+const sessionId = Number(route.params.sessionId) // será NaN si no hay sessionId en la ruta
 const role = 'therapist'
 
 const message = ref('Esperando paciente...')
@@ -13,6 +15,11 @@ onMounted(() => {
   const token = localStorage.getItem('token')
   if (!token) {
     console.warn('No token found; websocket will not connect')
+    return
+  }
+
+  if (!Number.isFinite(sessionId)) {
+    console.warn('sessionId no válido en la ruta; websocket no se conectará')
     return
   }
 

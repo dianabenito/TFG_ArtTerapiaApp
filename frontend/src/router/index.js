@@ -11,6 +11,9 @@ const routes = [
   { path: '/therapist/', component: TherapistGenerationView },
   { path: '/login/', component: LoginView },
   { path: '/home/', component: HomeView },
+  // session-specific routes (use sessionId param)
+  { path: '/session/:sessionId/patient', component: ComfyView, props: true },
+  { path: '/session/:sessionId/therapist', component: TherapistGenerationView, props: true },
 ]
 
 export const router = createRouter({

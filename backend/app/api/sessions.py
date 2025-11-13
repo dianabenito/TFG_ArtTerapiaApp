@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import SessionDep, CurrentUser
 import app.crud as crud
 import app.models as models
+from datetime import datetime
 
 router = APIRouter()
 
@@ -24,3 +25,32 @@ def create_session_for_patient(patient_id: int,
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     return crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
+
+
+@router.get('/active', response_model=schemas.Session)
+def get_active_session(db: SessionDep, current_user: CurrentUser):
+    """
+    Return the user's active session where now is between start_date and end_date.
+    Searches both patient and therapist roles.
+    """
+    now = datetime.utcnow()
+    # First try as patient
+    session = db.query(models.Session).filter(
+        models.Session.patient_id == current_user.id,
+        models.Session.start_date <= now,
+        models.Session.end_date >= now,
+    ).first()
+    if session:
+        return session
+
+    # Then try as therapist
+    session = db.query(models.Session).filter(
+        models.Session.therapist_id == current_user.id,
+        models.Session.start_date <= now,
+        models.Session.end_date >= now,
+    ).first()
+    if session:
+        return session
+
+    # Not found
+    raise HTTPException(status_code=404, detail="No active session")
