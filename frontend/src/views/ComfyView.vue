@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { comfyService } from '../api/comfyService'
+import { userService } from '../api/userService.js'
 
 import { useRoute } from 'vue-router'
 const API_URL = 'http://127.0.0.1:8000'
@@ -11,10 +12,11 @@ const role = 'patient'
 const prompt = ref({ promptText: '' })
 const imageUrl = ref('')
 const isLoading = ref(false)
+const sessionInfo = ref(null)
 
 let ws = null
 
-onMounted(() => {
+const connectWs = () => {
   const token = localStorage.getItem('token')
   if (!token) {
     console.warn('No token found; websocket will not connect')
@@ -23,6 +25,12 @@ onMounted(() => {
 
   if (!Number.isFinite(sessionId)) {
     console.warn('sessionId no válido en la ruta; websocket no se conectará')
+    return
+  }
+
+  // no conectar si sesión ya finalizada
+  if (sessionInfo.value?.ended_at) {
+    console.warn('La sesión ya está finalizada; no se conectará al websocket')
     return
   }
 
@@ -35,10 +43,31 @@ onMounted(() => {
       const obj = JSON.parse(ev.data)
       console.log('WS message (obj):', obj)
     } catch (e) {
+      // manejar mensaje plain text
+      const txt = String(ev.data)
+      if (txt === 'session_ended') {
+        // actualizar estado local
+        sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
+        ws?.close()
+        return
+      }
       console.log('WS message:', ev.data)
     }
   }
   ws.onclose = () => console.log('WS cerrado')
+}
+
+onMounted(async () => {
+  // obtener info de sesión
+  if (Number.isFinite(sessionId)) {
+    try {
+      sessionInfo.value = await userService.getSession(sessionId)
+    } catch (err) {
+      console.warn('No se pudo obtener la sesión:', err)
+    }
+  }
+
+  connectWs()
 })
 
 onBeforeUnmount(() => ws?.close())
@@ -73,6 +102,11 @@ const submitImage = () => {
 <template>
   <div>
     <h1>Generar imagen con ComfyUI</h1>
+
+    <div v-if="sessionInfo">
+      <p><strong>Sesión ID:</strong> {{ sessionInfo.id }}</p>
+      <p><strong>Estado:</strong> {{ sessionInfo.ended_at ? 'Finalizada' : 'Activa' }}</p>
+    </div>
     <input v-model="prompt.promptText" type="text" placeholder="Describe tu imagen" />
     <button @click="generateImage" :disabled="isLoading">
       {{ isLoading ? 'Generando...' : 'Generar' }}

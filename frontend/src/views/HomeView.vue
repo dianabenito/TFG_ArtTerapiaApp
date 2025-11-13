@@ -57,8 +57,9 @@ const logout = () => {
 
       <div v-if="activeSession" style="margin-top:1rem">
         <p class="muted">Tienes una sesión activa (ID: {{ activeSession.id }})</p>
-        <button v-if="user && user.type === 'patient'" @click="() => router.push(`/session/${activeSession.id}/patient`)">Ir a mi sesión (Paciente)</button>
-        <button v-else-if="user && user.type === 'therapist'" @click="() => router.push(`/session/${activeSession.id}/therapist`)">Ir a mi sesión (Terapeuta)</button>
+        <button v-if="user && user.type === 'patient' && !activeSession.ended_at" @click="() => router.push(`/session/${activeSession.id}/patient`)">Ir a mi sesión (Paciente)</button>
+        <button v-else-if="user && user.type === 'therapist' && !activeSession.ended_at" @click="() => router.push(`/session/${activeSession.id}/therapist`)">Ir a mi sesión (Terapeuta)</button>
+        <p v-else-if="activeSession.ended_at">La sesión está finalizada.</p>
       </div>
     </div>
   </div>

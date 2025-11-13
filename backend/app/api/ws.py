@@ -44,6 +44,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
             await websocket.close(code=1008)
             return
 
+        # If the session has been finalized by the therapist, reject new connections
+        if getattr(session, 'ended_at', None) is not None:
+            # Session already ended
+            await websocket.close(code=1008)
+            return
+
         # Verificar que el usuario coincide con el role y pertenece a la sesión
         if role == "patient":
             if user.id != session.patient_id:
@@ -66,7 +72,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
         active_sessions[session_id] = {}
 
     active_sessions[session_id][role] = websocket
-    print(f"🟢 {role} conectado en sesión {session_id} (user {user_id})")
+    print(f"{role} conectado en sesión {session_id} (user {user_id})")
 
     try:
         while True:
@@ -79,7 +85,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
                     # si no se puede enviar, eliminar la conexión y continuar
                     del active_sessions[session_id][other_role]
     except WebSocketDisconnect:
-        print(f"🔴 {role} desconectado de la sesión {session_id}")
+        print(f"{role} desconectado de la sesión {session_id}")
         if session_id in active_sessions and role in active_sessions[session_id]:
             del active_sessions[session_id][role]
         if session_id in active_sessions and not active_sessions[session_id]:

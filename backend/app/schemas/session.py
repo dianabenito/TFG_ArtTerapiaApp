@@ -6,6 +6,8 @@ from typing import Optional
 class SessionBase(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    # Timestamp when the therapist actually ended the session (optional)
+    ended_at: Optional[datetime] = None
 
 
 class SessionCreate(SessionBase):
