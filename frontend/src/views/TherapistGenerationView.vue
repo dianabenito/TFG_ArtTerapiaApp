@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 const API_URL = 'http://127.0.0.1:8000'
-const sessionId = 1
+const sessionId = 2
 const role = 'therapist'
 
 const message = ref('Esperando paciente...')
@@ -10,20 +10,26 @@ const latestImage = ref('')
 let socket = null
 
 onMounted(() => {
-  socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}`)
+  const token = localStorage.getItem('token')
+  if (!token) {
+    console.warn('No token found; websocket will not connect')
+    return
+  }
+
+  socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
 
   socket.onopen = () => console.log('Conectado al WS como terapeuta')
 
   socket.onmessage = (event) => {
     const raw = event.data
-  console.log('Mensaje recibido:', raw)
+    console.log('Mensaje recibido:', raw)
 
     // intentar parsear como JSON (caso en que el cliente envía {event, fileName})
     try {
       const obj = JSON.parse(raw)
       if (obj && obj.event === 'submit_image' && obj.fileName) {
-  latestImage.value = `${API_URL}/images/${obj.fileName}`
-  message.value = 'Nueva imagen enviada por el paciente:'
+        latestImage.value = `${API_URL}/images/${obj.fileName}`
+        message.value = 'Nueva imagen enviada por el paciente:'
         return
       }
     } catch (e) {

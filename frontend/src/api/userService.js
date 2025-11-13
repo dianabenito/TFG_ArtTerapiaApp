@@ -37,6 +37,10 @@ export const userService = {
     return response.data
   },
 
+  async logout() {
+    localStorage.removeItem('token')
+  }
+
 
 }
 

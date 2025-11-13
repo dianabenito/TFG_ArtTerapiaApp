@@ -1,21 +1,40 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { comfyService } from '../api/comfyService'
 
 const API_URL = 'http://127.0.0.1:8000'
-const sessionId = 1 // sesión activa
+const sessionId = 2 // sesión activa (ajusta según tu flujo)
 const role = 'patient'
 
-const prompt = ref({promptText: ''})
+const prompt = ref({ promptText: '' })
 const imageUrl = ref('')
 const isLoading = ref(false)
 
-let ws
+let ws = null
 
 onMounted(() => {
-  // connect using the server route: /ws/{session_id}/{role}
-  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}`)
+  const token = localStorage.getItem('token')
+  if (!token) {
+    console.warn('No token found; websocket will not connect')
+    return
+  }
+
+  // incluir token en query param para que el servidor lo valide
+  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
+
+  ws.onopen = () => console.log('WS conectado como paciente')
+  ws.onmessage = (ev) => {
+    try {
+      const obj = JSON.parse(ev.data)
+      console.log('WS message (obj):', obj)
+    } catch (e) {
+      console.log('WS message:', ev.data)
+    }
+  }
+  ws.onclose = () => console.log('WS cerrado')
 })
+
+onBeforeUnmount(() => ws?.close())
 
 const generateImage = async () => {
   try {
@@ -33,6 +52,10 @@ const generateImage = async () => {
 // Enviar la imagen al terapeuta
 const submitImage = () => {
   if (!imageUrl.value) return
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn('WebSocket no está abierto')
+    return
+  }
   ws.send(JSON.stringify({
     event: 'submit_image',
     fileName: imageUrl.value.split('/').pop()

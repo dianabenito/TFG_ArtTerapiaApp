@@ -21,6 +21,11 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const logout = () => {
+  userService.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -37,6 +42,10 @@ onMounted(async () => {
         <p>No has iniciado sesión.</p>
         <p>{{ errorMsg }}</p>
         <router-link to="/login">Ir a iniciar sesión</router-link>
+      </div>
+
+      <div>
+        <button @click="logout">Cerrar sesión</button>
       </div>
     </div>
   </div>
