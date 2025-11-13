@@ -1,17 +1,20 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { userService } from '../api/userService'
 
 const email = ref('')
 const password = ref('')
 const message = ref('')
 
+const router = useRouter()
+
 const login = async () => {
   try {
     const credentials = { email: email.value, password: password.value }
     const response = await userService.login(credentials)
     message.value = 'Inicio de sesión exitoso'
-    console.log('Token:', response.access_token)
+    router.push('/home')
   } catch (error) {
     message.value = error.response?.data?.detail || 'Error al iniciar sesión'
   }
