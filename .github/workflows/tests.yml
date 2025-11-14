@@ -24,10 +24,42 @@ jobs:
           python-version: "3.11.3"
 
       # 3. Instala dependencias de backend
+      - name: Prepare build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
+
       - name: Install backend dependencies
         run: |
-            python -m pip install --upgrade pip
-            pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Diagnose bcrypt/passlib environment
+        run: |
+          python - <<'PY'
+          import sys, pkgutil
+          print('PYTHON:', sys.version)
+          try:
+              import bcrypt
+              print('bcrypt imported:', bcrypt)
+              print('has __about__:', hasattr(bcrypt, '__about__'))
+              print('bcrypt.__version__:', getattr(bcrypt, '__version__', None))
+              print('bcrypt.__about__:', getattr(bcrypt, '__about__', None))
+          except Exception as e:
+              print('bcrypt import error:', repr(e))
+          try:
+              import passlib
+              from passlib.context import CryptContext
+              ctx = CryptContext(schemes=['bcrypt_sha256','bcrypt'])
+              print('passlib CryptContext created OK')
+          except Exception as e:
+              print('passlib CryptContext error:', repr(e))
+          import subprocess
+          print('\nPIP freeze:')
+          import pkg_resources
+          for p in sorted(pkg_resources.working_set, key=lambda p: p.project_name.lower()):
+              print(p.project_name, p.version)
+          PY
 
       # 4. Ejecuta pruebas de backend
       - name: Run backend tests
