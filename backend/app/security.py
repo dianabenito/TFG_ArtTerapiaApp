@@ -1,50 +1,38 @@
 from fastapi import HTTPException, status
-from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import hashlib
+import logging
+import bcrypt
 
-# Configure password hashing context.
-# Prefer `bcrypt_sha256` which pre-hashes long passwords before passing to
-# the bcrypt C implementation (avoids the 72-byte limit issues). Fall back
-# to plain `bcrypt` if that's all that's available. If neither can be
-# initialized, log a warning and fall back to plaintext for test/CI
-# environments only.
-try:
-    pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated="auto")
-except Exception:
-    # As a last resort (very unusual), use plaintext so tests can still run.
-    # This keeps behavior deterministic in constrained CI environments.
-    import warnings
-    warnings.warn("Unable to initialize bcrypt backend for passlib; falling back to plaintext hasher")
-    pwd_context = CryptContext(schemes=["plaintext"], deprecated="auto")
+_log = logging.getLogger(__name__)
 
 SECRET_KEY = "supersecretkey123456"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
+def _prehash_bytes(password: str) -> bytes:
+    """Return SHA-256 digest bytes for `password`."""
+    return hashlib.sha256(password.encode("utf-8")).digest()
+
+
 def hash_password(password: str) -> str:
-    # bcrypt has a 72-byte input limit. Truncate by bytes (UTF-8) to avoid
-    # raising a backend ValueError in environments with a strict bcrypt.
-    b = password.encode("utf-8")
-    if len(b) > 72:
-        import logging
-        logging.getLogger(__name__).warning("Password longer than 72 bytes; truncating to 72 bytes before hashing")
-        b = b[:72]
-    # passlib accepts bytes as the secret; this keeps truncation consistent
-    # between hashing and verification.
-    return pwd_context.hash(b)
+    """Hash a password using SHA-256 pre-hash and bcrypt.
+
+    We pre-hash with SHA-256 to avoid bcrypt's 72-byte input limit and to
+    ensure deterministic, constant-length input to the bcrypt C backend.
+    The returned value is the bcrypt ASCII hash string (UTF-8).
+    """
+    pre = _prehash_bytes(password)
+    hashed = bcrypt.hashpw(pre, bcrypt.gensalt())
+    return hashed.decode("utf-8")
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # Mirror the same truncation we apply at hash time so verification
-    # behaves consistently.
-    b = plain_password.encode("utf-8")
-    if len(b) > 72:
-        from logging import getLogger
-        getLogger(__name__).warning("Password longer than 72 bytes; truncating to 72 bytes before verify")
-        b = b[:72]
     try:
-        return pwd_context.verify(b, hashed_password)
+        pre = _prehash_bytes(plain_password)
+        return bcrypt.checkpw(pre, hashed_password.encode("utf-8"))
     except Exception:
         return False
 
