@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from fastapi.security import OAuth2PasswordRequestForm
+from typing import Annotated, List
 import app.schemas as schemas
 from sqlalchemy.orm import Session
-from app.dependencies import SessionDep
+from app.dependencies import SessionDep, CurrentUser
 import app.crud as crud
 
 router = APIRouter()
@@ -11,6 +12,13 @@ router = APIRouter()
 async def read_users(db: SessionDep, skip: int = 0, limit: int = 10):
     users = crud.user.get_users(db, skip=skip, limit=limit)
     return users
+
+@router.get("/users/me", response_model=schemas.User)
+def read_user_me(db: SessionDep, current_user: CurrentUser):
+    """
+    Get current user.
+    """
+    return current_user
 
 @router.get("/users/{user_id}", response_model=schemas.User)
 async def read_user(db: SessionDep, user_id: int):
@@ -25,3 +33,10 @@ async def create_user(db: SessionDep, user: schemas.UserCreate):
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud.user.create_user(db=db, user=user)
+
+@router.post("/login/")
+async def login_access_token(db: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    """
+    OAuth2 compatible token login, get an access token for future requests
+    """
+    return crud.user.login_user(db=db, email=form_data.username, password=form_data.password)
