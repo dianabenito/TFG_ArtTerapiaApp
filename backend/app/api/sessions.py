@@ -39,6 +39,7 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
         models.Session.patient_id == current_user.id,
         models.Session.start_date <= now,
         models.Session.end_date >= now,
+        models.Session.ended_at == None,
     ).first()
     if session:
         return session
@@ -48,6 +49,7 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
         models.Session.therapist_id == current_user.id,
         models.Session.start_date <= now,
         models.Session.end_date >= now,
+        models.Session.ended_at == None,
     ).first()
     if session:
         return session
