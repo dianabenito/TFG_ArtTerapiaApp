@@ -3,9 +3,11 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService.js'
 
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { showToast } from '../stores/toastStore.js'
 const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
+const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
 const role = 'patient'
 
@@ -49,6 +51,13 @@ const connectWs = () => {
         // actualizar estado local
         sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
         ws?.close()
+        // redirigir al paciente a Home
+        try {
+          alert('La sesión ha sido finalizada por el terapeuta.')
+          router.push('/home')
+        } catch (e) {
+          console.warn('No se pudo redirigir tras finalización de sesión:', e)
+        }
         return
       }
       console.log('WS message:', ev.data)
@@ -62,6 +71,16 @@ onMounted(async () => {
   if (Number.isFinite(sessionId)) {
     try {
       sessionInfo.value = await userService.getSession(sessionId)
+      // si la sesión ya está finalizada, mostrar alerta y redirigir al home
+      if (sessionInfo.value?.ended_at) {
+        try {
+          alert('La sesión ha sido finalizada por el terapeuta.')
+          router.push('/home')
+          return
+        } catch (e) {
+          console.warn('No se pudo redirigir tras detectar sesión finalizada:', e)
+        }
+      }
     } catch (err) {
       console.warn('No se pudo obtener la sesión:', err)
     }
@@ -96,6 +115,12 @@ const submitImage = () => {
     event: 'submit_image',
     fileName: imageUrl.value.split('/').pop()
   }))
+  // mostrar confirmación de envío al usuario
+  try {
+    showToast('Imagen enviada correctamente', { type: 'success', duration: 2200 })
+  } catch (e) {
+    console.warn('No se pudo mostrar toast tras enviar la imagen:', e)
+  }
 }
 </script>
 
