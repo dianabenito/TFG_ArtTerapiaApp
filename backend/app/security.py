@@ -1,23 +1,40 @@
 from fastapi import HTTPException, status
-from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import hashlib
+import logging
+import bcrypt
 
-# Configurar contexto bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_log = logging.getLogger(__name__)
 
 SECRET_KEY = "supersecretkey123456"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
+def _prehash_bytes(password: str) -> bytes:
+    """Return SHA-256 digest bytes for `password`."""
+    return hashlib.sha256(password.encode("utf-8")).digest()
+
+
 def hash_password(password: str) -> str:
-    if len(password) > 72:
-        password = password[:72]
-    return pwd_context.hash(password)
+    """Hash a password using SHA-256 pre-hash and bcrypt.
+
+    We pre-hash with SHA-256 to avoid bcrypt's 72-byte input limit and to
+    ensure deterministic, constant-length input to the bcrypt C backend.
+    The returned value is the bcrypt ASCII hash string (UTF-8).
+    """
+    pre = _prehash_bytes(password)
+    hashed = bcrypt.hashpw(pre, bcrypt.gensalt())
+    return hashed.decode("utf-8")
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        pre = _prehash_bytes(plain_password)
+        return bcrypt.checkpw(pre, hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
