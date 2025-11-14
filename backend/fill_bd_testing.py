@@ -56,6 +56,7 @@ def main():
         t1 = get_or_create_user(db, models.Therapist, 'therapist1@example.com', 'T@ssword1')
         t2 = get_or_create_user(db, models.Therapist, 'therapist2@example.com', 'T@ssword2')
         t3 = get_or_create_user(db, models.Therapist, 'therapist3@example.com', 'T@ssword3')
+        t4 = get_or_create_user(db, models.Therapist, 'therapist4@example.com', 'T@ssword4')
 
         print(f'Usuarios: p1={p1.id}, p2={p2.id}, t1={t1.id}, t2={t2.id}')
 
