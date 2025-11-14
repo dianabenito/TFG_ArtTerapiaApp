@@ -24,12 +24,29 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
 def hash_password(password: str) -> str:
-    if len(password) > 72:
-        password = password[:72]
-    return pwd_context.hash(password)
+    # bcrypt has a 72-byte input limit. Truncate by bytes (UTF-8) to avoid
+    # raising a backend ValueError in environments with a strict bcrypt.
+    b = password.encode("utf-8")
+    if len(b) > 72:
+        import logging
+        logging.getLogger(__name__).warning("Password longer than 72 bytes; truncating to 72 bytes before hashing")
+        b = b[:72]
+    # passlib accepts bytes as the secret; this keeps truncation consistent
+    # between hashing and verification.
+    return pwd_context.hash(b)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    # Mirror the same truncation we apply at hash time so verification
+    # behaves consistently.
+    b = plain_password.encode("utf-8")
+    if len(b) > 72:
+        from logging import getLogger
+        getLogger(__name__).warning("Password longer than 72 bytes; truncating to 72 bytes before verify")
+        b = b[:72]
+    try:
+        return pwd_context.verify(b, hashed_password)
+    except Exception:
+        return False
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
