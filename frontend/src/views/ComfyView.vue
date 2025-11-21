@@ -13,6 +13,7 @@ const role = 'patient'
 
 const prompt = ref({ promptText: '' })
 const imageUrl = ref('')
+const active_user = ref(null)
 const isLoading = ref(false)
 const sessionInfo = ref(null)
 
@@ -95,7 +96,14 @@ const generateImage = async () => {
   try {
     isLoading.value = true
     imageUrl.value = ''
-    const response = await comfyService.createImage(prompt.value)
+
+    // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
+    // active_user.value = await userService.getCurrentUser()
+    // const response = await comfyService.createImage(prompt.value, active_user.value.id)
+    
+    // Y COMENTAR ESTA
+    const response = await comfyService.createImage(prompt.value, 2)
+
     if (response.file) {
       imageUrl.value = `${API_URL}/images/${response.file}`
     }

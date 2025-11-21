@@ -1,3 +1,4 @@
+import random
 import requests
 import json
 import time
@@ -18,10 +19,12 @@ BASE_DIR = Path(__file__).parent.parent.parent
 CARPETA_DESTINO = BASE_DIR.parent / "frontend" / "src" / "assets" / "generated_images"
 
 # Ruta del workflow.json
-WORKFLOW_PATH = BASE_DIR / "workflow.json"
+WORKFLOW_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
 
 # URL de ComfyUI
 COMFYUI_URL = "http://127.0.0.1:8188/prompt"
+
+MAX_SQLITE_INT = 9223372036854775807
 
 class ImagenHandler(FileSystemEventHandler):
     """Handler para detectar cuando se crea una nueva imagen en ComfyUI"""
@@ -60,7 +63,7 @@ class ImagenHandler(FileSystemEventHandler):
 
 
 
-def esperar_imagen(prefijo: str, timeout: int = 60) -> Optional[str]:
+def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
     """
     Espera a que se genere una imagen con el prefijo especificado.
     
@@ -115,14 +118,16 @@ def generar_imagen(prompt_text: str) -> dict:
     with open(WORKFLOW_PATH, "r") as f:
         workflow = json.load(f)
 
-    # Actualizar el prompt en el workflow
-    workflow["2"]["inputs"]["text"] = prompt_text
+    seed = random.randint(0, MAX_SQLITE_INT)
+
+    workflow["6"]["inputs"]["text"] = prompt_text
+    workflow["3"]["inputs"]["seed"] = seed
 
     # Enviar petición a ComfyUI
     payload = {"prompt": workflow}
     
     try:
-        response = requests.post(COMFYUI_URL, json=payload, timeout=30)
+        response = requests.post(COMFYUI_URL, json=payload, timeout=300)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         raise HTTPException(
@@ -139,7 +144,8 @@ def generar_imagen(prompt_text: str) -> dict:
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,
-            "fullPath": ruta_imagen
+            "fullPath": ruta_imagen,
+            "seed": seed
         }
     else:
         raise HTTPException(
