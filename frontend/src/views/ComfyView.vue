@@ -13,6 +13,8 @@ const role = 'patient'
 
 const prompt = ref({ promptText: '' })
 const imageUrl = ref('')
+const seedLastImg = ref(null)
+const uploadFile = ref(null)
 const active_user = ref(null)
 const isLoading = ref(false)
 const sessionInfo = ref(null)
@@ -103,10 +105,37 @@ const generateImage = async () => {
     
     // Y COMENTAR ESTA
     const response = await comfyService.createImage(prompt.value, 2)
+    console.log('Imagen generada:', response)
 
     if (response.file) {
-      imageUrl.value = `${API_URL}/images/${response.file}`
+      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      seedLastImg.value = response.seed
     }
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const onFileChange = (ev) => {
+  const f = ev.target.files && ev.target.files[0]
+  if (f) uploadFile.value = f
+}
+
+const uploadUserImage = async () => {
+  if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
+  try {
+    isLoading.value = true
+    const resp = await comfyService.uploadImage(uploadFile.value, 2)
+    console.log('Imagen subida:', resp)
+    if (resp.file) {
+      imageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+      seedLastImg.value = resp.seed
+      showToast('Imagen subida correctamente', { type: 'success' })
+      uploadFile.value = null
+    }
+  } catch (e) {
+    showToast('Error subiendo imagen', { type: 'error' })
+    console.error(e)
   } finally {
     isLoading.value = false
   }
@@ -145,10 +174,21 @@ const submitImage = () => {
       {{ isLoading ? 'Generando...' : 'Generar' }}
     </button>
 
+    <!-- Upload from gallery -->
+    <div style="margin-top:1rem;">
+      <label for="fileInput">Subir imagen desde galería:</label>
+      <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
+      <button @click="uploadUserImage" :disabled="isLoading || !uploadFile" style="margin-left:0.5rem;">
+        {{'Subir imagen' }}
+      </button>
+      <div v-if="uploadFile" style="margin-top:.5rem; font-size:.9rem; color:#444;">Seleccionado: {{ uploadFile.name || uploadFile.filename }}</div>
+    </div>
+
     <div v-if="imageUrl">
       <h2>Imagen generada:</h2>
       <img :src="imageUrl" alt="Imagen generada" style="max-width: 100%; height: auto;" />
       <button @click="submitImage" style="margin-top:1rem;">Enviar al terapeuta</button>
+      <div v-if="imageUrl && seedLastImg">Seed: {{ seedLastImg }}</div>
     </div>
   </div>
 </template>

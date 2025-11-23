@@ -9,6 +9,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 from fastapi import HTTPException
+import uuid
 
 # Carpeta externa donde se generan las imágenes
 CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output"
@@ -16,7 +17,8 @@ CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/
 # Obtener la ruta base del proyecto (backend/)
 BASE_DIR = Path(__file__).parent.parent.parent
 # Carpeta de destino dentro del proyecto
-CARPETA_DESTINO = BASE_DIR.parent / "frontend" / "src" / "assets" / "generated_images"
+CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
+CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
 
 # Ruta del workflow.json
 WORKFLOW_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
@@ -53,8 +55,8 @@ class ImagenHandler(FileSystemEventHandler):
                 elapsed += wait_time
 
             # Asegurar que la carpeta de destino existe
-            os.makedirs(str(CARPETA_DESTINO), exist_ok=True)
-            destino = os.path.join(str(CARPETA_DESTINO), nombre)
+            os.makedirs(str(CARPETA_DESTINO_GEN), exist_ok=True)
+            destino = os.path.join(str(CARPETA_DESTINO_GEN), nombre)
 
             # Copiar la imagen
             shutil.copyfile(origen, destino)
@@ -122,6 +124,7 @@ def generar_imagen(prompt_text: str) -> dict:
 
     workflow["6"]["inputs"]["text"] = prompt_text
     workflow["3"]["inputs"]["seed"] = seed
+    workflow["9"]["inputs"]["filename_prefix"] = "generated"
 
     # Enviar petición a ComfyUI
     payload = {"prompt": workflow}
@@ -136,7 +139,7 @@ def generar_imagen(prompt_text: str) -> dict:
         )
 
     # Esperar a que se genere la imagen
-    ruta_imagen = esperar_imagen("simple_test")
+    ruta_imagen = esperar_imagen("generated")
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
@@ -153,3 +156,18 @@ def generar_imagen(prompt_text: str) -> dict:
             detail="No se encontró la imagen generada. Tiempo de espera agotado."
         )
 
+
+def publicar_imagen(upload_file):
+    os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
+
+    # create unique filename to avoid collisions
+    original_name = getattr(upload_file, 'filename', 'upload')
+    ext = os.path.splitext(original_name)[1] or '.png'
+    filename = f"uploaded_{uuid.uuid4().hex}{ext}"
+    destino_path = CARPETA_DESTINO_UPL / filename
+
+    # write file contents
+    with open(destino_path, 'wb') as f:
+        f.write(upload_file.file.read())
+
+    return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
