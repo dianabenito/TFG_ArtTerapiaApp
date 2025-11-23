@@ -11,7 +11,8 @@ def create_user_image(db: Session, prompt: schemas.Prompt, user_id: int):
     if db_user.type != 'patient':
         raise HTTPException(status_code=404, detail="Therapists cannot have images")
     image = services.image_generation.generar_imagen(prompt.promptText)
-    db_image = models.Image(fileName=image["file"], seed = image["seed"], owner_id=user_id)
+    seed = image.get("seed") if isinstance(image, dict) else None
+    db_image = models.Image(fileName=image["file"], seed=seed, owner_id=user_id)
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
