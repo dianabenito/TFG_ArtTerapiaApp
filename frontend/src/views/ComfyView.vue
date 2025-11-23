@@ -11,7 +11,7 @@ const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
 const role = 'patient'
 
-const prompt = ref({ promptText: '' })
+const prompt = ref({ promptText: '', seed: null })
 const imageUrl = ref('')
 const seedLastImg = ref(null)
 const uploadFile = ref(null)
@@ -94,10 +94,17 @@ onMounted(async () => {
 
 onBeforeUnmount(() => ws?.close())
 
-const generateImage = async () => {
+const generateImage = async (last_seed = null) => {
   try {
     isLoading.value = true
     imageUrl.value = ''
+
+    // Only accept numeric seeds; ignore click events or other objects
+    if (typeof last_seed === 'number') {
+      prompt.value.seed = last_seed
+    } else {
+      prompt.value.seed = null
+    }
 
     // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
     // active_user.value = await userService.getCurrentUser()
@@ -111,6 +118,11 @@ const generateImage = async () => {
       imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
       seedLastImg.value = response.seed
     }
+  } catch (e) {
+    // show server-side validation errors if any
+    const detail = e?.response?.data?.detail || e?.message || String(e)
+    showToast('Error generando imagen: ' + detail, { type: 'error' })
+    console.error('Error generating image:', e)
   } finally {
     isLoading.value = false
   }
@@ -170,9 +182,13 @@ const submitImage = () => {
       <p><strong>Estado:</strong> {{ sessionInfo.ended_at ? 'Finalizada' : 'Activa' }}</p>
     </div>
     <input v-model="prompt.promptText" type="text" placeholder="Describe tu imagen" />
-    <button @click="generateImage" :disabled="isLoading">
+    <button @click="generateImage()" :disabled="isLoading">
       {{ isLoading ? 'Generando...' : 'Generar' }}
     </button>
+
+    <div v-if="seedLastImg">
+      <button @click="generateImage(seedLastImg)" :disabled="isLoading">Generar con último seed</button>
+    </div>
 
     <!-- Upload from gallery -->
     <div style="margin-top:1rem;">

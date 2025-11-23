@@ -97,7 +97,7 @@ def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
     return None
 
 
-def generar_imagen(prompt_text: str) -> dict:
+def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None) -> dict:
     """
     Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
     
@@ -120,7 +120,10 @@ def generar_imagen(prompt_text: str) -> dict:
     with open(WORKFLOW_PATH, "r") as f:
         workflow = json.load(f)
 
-    seed = random.randint(0, MAX_SQLITE_INT)
+    if(prompt_seed):
+        seed = prompt_seed
+    else:
+        seed = random.randint(0, MAX_SQLITE_INT)
 
     workflow["6"]["inputs"]["text"] = prompt_text
     workflow["3"]["inputs"]["seed"] = seed
