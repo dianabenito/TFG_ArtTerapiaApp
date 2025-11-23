@@ -21,7 +21,8 @@ CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images"
 CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
 
 # Ruta del workflow.json
-WORKFLOW_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
+WORKFLOW_TXT2IMG_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
+WORKFLOW_IMG2IMG_PATH = BASE_DIR / "workflows" / "sdxl img2img api workflow.json"
 
 # URL de ComfyUI
 COMFYUI_URL = "http://127.0.0.1:8188/prompt"
@@ -97,7 +98,7 @@ def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
     return None
 
 
-def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None) -> dict:
+def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_img: Optional[str] = None) -> dict:
     """
     Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
     
@@ -110,20 +111,21 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None) -> dict:
     Raises:
         HTTPException: Si hay un error al generar la imagen
     """
-    # Cargar workflow base
-    if not WORKFLOW_PATH.exists():
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Workflow file not found at {WORKFLOW_PATH}"
-        )
     
-    with open(WORKFLOW_PATH, "r") as f:
-        workflow = json.load(f)
+    if(input_img):
+        with open(WORKFLOW_IMG2IMG_PATH, "r") as f:
+            workflow = json.load(f)
+    else:
+        with open(WORKFLOW_TXT2IMG_PATH, "r") as f:
+            workflow = json.load(f)
 
     if(prompt_seed):
         seed = prompt_seed
     else:
         seed = random.randint(0, MAX_SQLITE_INT)
+
+    if(input_img):
+        workflow["10"]["inputs"]["image_path"] = input_img
 
     workflow["6"]["inputs"]["text"] = prompt_text
     workflow["3"]["inputs"]["seed"] = seed

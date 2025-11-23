@@ -5,6 +5,7 @@ from typing import Optional
 class Prompt(BaseModel):
     promptText: str
     seed: Optional[int] = None
+    inputImage: Optional[str] = None
 
 
 class ImageGenerationResponse(BaseModel):

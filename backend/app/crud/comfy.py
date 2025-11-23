@@ -10,7 +10,7 @@ def create_user_image(db: Session, prompt: schemas.Prompt, user_id: int):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user.type != 'patient':
         raise HTTPException(status_code=404, detail="Therapists cannot have images")
-    image = services.image_generation.generar_imagen(prompt.promptText, prompt_seed=prompt.seed)
+    image = services.image_generation.generar_imagen(prompt.promptText, prompt_seed=prompt.seed, input_img=prompt.inputImage)
     gen_seed = image.get("seed") if isinstance(image, dict) else None
     db_image = models.Image(fileName=image["file"], seed=gen_seed, owner_id=user_id)
     db.add(db_image)

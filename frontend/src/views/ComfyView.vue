@@ -11,13 +11,14 @@ const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
 const role = 'patient'
 
-const prompt = ref({ promptText: '', seed: null })
+const prompt = ref({ promptText: '', seed: null, inputImage: null })
 const imageUrl = ref('')
 const seedLastImg = ref(null)
 const uploadFile = ref(null)
 const active_user = ref(null)
 const isLoading = ref(false)
 const sessionInfo = ref(null)
+const inputImage = ref(null)
 
 let ws = null
 
@@ -94,7 +95,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => ws?.close())
 
-const generateImage = async (last_seed = null) => {
+const generateImage = async (last_seed = null, inputImage = null) => {
   try {
     isLoading.value = true
     imageUrl.value = ''
@@ -105,6 +106,15 @@ const generateImage = async (last_seed = null) => {
     } else {
       prompt.value.seed = null
     }
+
+    console.log(inputImage)
+
+    if(inputImage) {
+      prompt.value.inputImage = inputImage
+    } else {
+      prompt.value.inputImage = null
+    }
+
 
     // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
     // active_user.value = await userService.getCurrentUser()
@@ -188,6 +198,10 @@ const submitImage = () => {
 
     <div v-if="seedLastImg">
       <button @click="generateImage(seedLastImg)" :disabled="isLoading">Generar con último seed</button>
+    </div>
+
+    <div v-if="imageUrl">
+      <button @click="generateImage(null, imageUrl)" :disabled="isLoading">Img+text to img</button>
     </div>
 
     <!-- Upload from gallery -->
