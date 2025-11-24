@@ -2,7 +2,7 @@
   "3": {
     "inputs": {
       "seed": 804639666562571,
-      "steps": 4,
+      "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
       "scheduler": "karras",
@@ -40,8 +40,8 @@
   },
   "5": {
     "inputs": {
-      "width": 1024,
-      "height": 1024,
+      "width": 512,
+      "height": 512,
       "batch_size": 1
     },
     "class_type": "EmptyLatentImage",

@@ -20,6 +20,10 @@ const isLoading = ref(false)
 const sessionInfo = ref(null)
 const inputImage = ref(null)
 
+// Refine modal state
+const showRefineModal = ref(false)
+const modalLoading = ref(false)
+
 let ws = null
 
 const connectWs = () => {
@@ -126,6 +130,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
 
     if (response.file) {
       imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      console.log('Modal image URL:', prompt)
       seedLastImg.value = response.seed
     }
   } catch (e) {
@@ -136,6 +141,57 @@ const generateImage = async (last_seed = null, inputImage = null) => {
   } finally {
     isLoading.value = false
   }
+}
+
+// Open refine modal: generate initial image and allow regenerations with same seed
+const openRefineModal = async () => {
+  showRefineModal.value = true
+  prompt.value.seed = null
+  // generate initial image to obtain a seed
+  try {
+    modalLoading.value = true
+    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: null }, 2)
+    console.log('Modal initial generation:', resp)
+    if (resp.file) {
+      imageUrl.value = `${API_URL}/images/generated_images/${resp.file}`
+      console.log('Modal image URL:', prompt)
+      prompt.value.seed = resp.seed
+    }
+  } catch (e) {
+    showToast('Error generando imagen en el modal: ' + (e?.response?.data?.detail || e?.message || String(e)), { type: 'error' })
+    console.error('Modal generation error:', e)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+const modalRegenerate = async () => {
+  if (!showRefineModal.value) return
+  try {
+    modalLoading.value = true
+    // keep the same seed if present (pass the primitive value, not the ref)
+    const seedToUse = prompt.value.seed ?? null
+    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, 2)
+    console.log('Modal regenerate:', resp)
+    if (resp.file) {
+      imageUrl.value = `${API_URL}/images/generated_images/${resp.file}`
+      prompt.value.seed = resp.seed
+    }
+  } catch (e) {
+    showToast('Error regenerando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)), { type: 'error' })
+    console.error('Modal regenerate error:', e)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+const modalConfirm = () => {
+  // set main view to modal image and seed
+  if (imageUrl.value) {
+    imageUrl.value = imageUrl.value
+    seedLastImg.value = prompt.value.seed
+  }
+  showRefineModal.value = false
 }
 
 const onFileChange = (ev) => {
@@ -192,16 +248,9 @@ const submitImage = () => {
       <p><strong>Estado:</strong> {{ sessionInfo.ended_at ? 'Finalizada' : 'Activa' }}</p>
     </div>
     <input v-model="prompt.promptText" type="text" placeholder="Describe tu imagen" />
-    <button @click="generateImage()" :disabled="isLoading">
-      {{ isLoading ? 'Generando...' : 'Generar' }}
-    </button>
-
-    <div v-if="seedLastImg">
-      <button @click="generateImage(seedLastImg)" :disabled="isLoading">Generar con último seed</button>
-    </div>
-
-    <div v-if="imageUrl">
-      <button @click="generateImage(null, imageUrl)" :disabled="isLoading">Img+text to img</button>
+    <div style="margin-top: .5rem">
+      <button @click="openRefineModal()" :disabled="isLoading">Crear con texto</button>
+      <button v-if="imageUrl" @click="generateImage(null, imageUrl)" :disabled="isLoading" style="margin-left:.5rem;">Crear a partir de imagen</button>
     </div>
 
     <!-- Upload from gallery -->
@@ -212,6 +261,28 @@ const submitImage = () => {
         {{'Subir imagen' }}
       </button>
       <div v-if="uploadFile" style="margin-top:.5rem; font-size:.9rem; color:#444;">Seleccionado: {{ uploadFile.name || uploadFile.filename }}</div>
+    </div>
+
+    <!-- Refine Modal -->
+    <div v-if="showRefineModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <h3>Perfeccionar imagen (seed: {{ prompt.seed }})</h3>
+        <div>
+          <label>Prompt:</label>
+          <input v-model="prompt.promptText" type="text" style="width:100%;" />
+        </div>
+        <div style="margin-top:.5rem;">
+          <button @click="modalRegenerate" :disabled="modalLoading">Regenerar (mantener seed)</button>
+          <button @click="modalConfirm" :disabled="modalLoading || !imageUrl" style="margin-left:.5rem;">Confirmar</button>
+        </div>
+        <div style="margin-top:.75rem;">
+          <div v-if="modalLoading">Generando...</div>
+          <div v-else-if="imageUrl">
+            <img :src="imageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
+          </div>
+          <div v-else style="color:#666">Aún no hay imagen generada.</div>
+        </div>
+      </div>
     </div>
 
     <div v-if="imageUrl">
