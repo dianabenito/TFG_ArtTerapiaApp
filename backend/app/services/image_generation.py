@@ -1,4 +1,5 @@
 import random
+from urllib.parse import urlparse
 import requests
 import json
 import time
@@ -10,6 +11,7 @@ from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 from fastapi import HTTPException
 import uuid
+from pathlib import Path
 
 # Carpeta externa donde se generan las imágenes
 CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output"
@@ -19,6 +21,8 @@ BASE_DIR = Path(__file__).parent.parent.parent
 # Carpeta de destino dentro del proyecto
 CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
 CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
+
+CARPETA_COMFY_INPUT = Path(r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input")
 
 # Ruta del workflow.json
 WORKFLOW_TXT2IMG_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
@@ -125,7 +129,16 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
         seed = random.randint(0, MAX_SQLITE_INT)
 
     if(input_img):
-        workflow["10"]["inputs"]["image_path"] = input_img
+        filename = input_img.rpartition('/')[-1]
+        print(f"Using input image: {filename}")
+
+        origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
+
+        print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+        destino_path = CARPETA_COMFY_INPUT / filename
+        shutil.copy(origin_path, destino_path)
+            
+        workflow["10"]["inputs"]["image"] = filename
 
     workflow["6"]["inputs"]["text"] = prompt_text
     workflow["3"]["inputs"]["seed"] = seed
