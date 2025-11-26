@@ -38,7 +38,8 @@ const connectSocket = () => {
     try {
       const obj = JSON.parse(raw)
       if (obj && obj.event === 'submit_image' && obj.fileName) {
-        latestImage.value = `${API_URL}/images/${obj.fileName}`
+        const mount = (obj.fileName && obj.fileName.includes('generated')) ? 'generated_images' : 'uploaded_images'
+        latestImage.value = `${API_URL}/images/${mount}/${obj.fileName}`
         message.value = 'Nueva imagen enviada por el paciente:'
         return
       }
