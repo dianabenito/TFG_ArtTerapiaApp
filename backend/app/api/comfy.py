@@ -19,3 +19,12 @@ async def generate_image_for_user(db: SessionDep, user_id: int, prompt: schemas.
 async def upload_image_for_user(db: SessionDep, user_id: int, file: UploadFile = File(...)):
     """Endpoint para que el usuario suba una imagen desde su galería."""
     return crud.comfy.create_user_uploaded_image(db=db, upload_file=file, user_id=user_id)
+
+@router.get('/users/{user_id}/images', response_model=schemas.ImagesOut)
+async def get_images_for_user(db: SessionDep, user_id: int):
+    """Endpoint para que el usuario suba una imagen desde su galería."""
+    return crud.comfy.get_images_for_user(db=db, user_id=user_id)
+
+@router.get("/template-images")
+def get_template_images():
+    return crud.comfy.get_template_images()

@@ -21,6 +21,7 @@ BASE_DIR = Path(__file__).parent.parent.parent
 # Carpeta de destino dentro del proyecto
 CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
 CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
+CARPETA_TEMPLATES = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "template_images"
 
 CARPETA_COMFY_INPUT = Path(r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input")
 
@@ -189,3 +190,13 @@ def publicar_imagen(upload_file):
         f.write(upload_file.file.read())
 
     return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
+
+def obtener_imagenes_plantilla():
+    try:
+        files = [
+            f for f in os.listdir(CARPETA_TEMPLATES)
+            if os.path.isfile(os.path.join(CARPETA_TEMPLATES, f))
+        ]
+        return {"images": files}
+    except Exception as e:
+        return {"error": str(e)}

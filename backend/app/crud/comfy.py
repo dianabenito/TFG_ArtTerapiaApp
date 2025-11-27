@@ -34,3 +34,19 @@ def create_user_uploaded_image(db: Session, upload_file, user_id: int):
     db.refresh(db_image)
 
     return image
+
+def get_images_for_user(db: Session, user_id: int):
+    """Retrieve all images for a given user."""
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    images = db.query(models.Image).filter(models.Image.owner_id == user_id).all()
+    return {
+        "data": images,
+        "count": len(images)
+    }
+
+def get_template_images():
+    """Retrieve all template images from the template directory."""
+    return services.image_generation.obtener_imagenes_plantilla()

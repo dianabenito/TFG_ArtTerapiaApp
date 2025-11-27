@@ -22,3 +22,14 @@ class ImageGenerationError(BaseModel):
 
 class UploadedFile(BaseModel):
     filename: str
+
+
+class ImageOut(BaseModel):
+    fileName: str
+    seed: Optional[int] = None
+    id: int
+
+
+class ImagesOut(BaseModel):
+    data: list[ImageOut]
+    count: int

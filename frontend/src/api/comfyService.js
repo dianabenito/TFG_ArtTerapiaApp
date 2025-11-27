@@ -28,5 +28,14 @@ export const comfyService = {
     return response.data
   },
 
+  async getImagesForUser(userId = 2) {
+    const response = await axios.get(`${API_URL}/comfy/users/${userId}/images`)
+    return response.data
+  },
 
+  async getTemplateImages() {
+    const response = await axios.get(`${API_URL}/comfy/template-images`)
+    return response.data
+  }
+  
 }
