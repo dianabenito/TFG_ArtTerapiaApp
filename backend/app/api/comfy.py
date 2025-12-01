@@ -14,6 +14,14 @@ async def generate_image_for_user(db: SessionDep, user_id: int, prompt: schemas.
     db_user = crud.user.get_user(db, user_id=user_id)
     return crud.comfy.create_user_image(db=db, prompt=prompt, user_id=user_id)
 
+@router.post("/users/{user_id}/multiple-images/", response_model=schemas.ImageGenerationResponse)
+async def generate_image_for_user(db: SessionDep, user_id: int, images: schemas.TemplateImagesIn):
+    """
+    Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
+    """
+    db_user = crud.user.get_user(db, user_id=user_id)
+    return crud.comfy.create_user_img_by_mult_images(db=db, images=images, user_id=user_id)
+
 
 @router.post('/users/{user_id}/images/upload', response_model=schemas.ImageGenerationResponse)
 async def upload_image_for_user(db: SessionDep, user_id: int, file: UploadFile = File(...)):

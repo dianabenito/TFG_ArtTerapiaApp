@@ -33,3 +33,10 @@ class ImageOut(BaseModel):
 class ImagesOut(BaseModel):
     data: list[ImageOut]
     count: int
+
+class ImageTemplate(BaseModel):
+    fileName: str
+
+class TemplateImagesIn(BaseModel):
+    data: list[ImageTemplate]
+    count: int
