@@ -9,7 +9,7 @@ def test_generate_image_endpoint(client, monkeypatch):
     uid = patient['id']
 
     # monkeypatch the external generator to avoid calling ComfyUI
-    def fake_generar(prompt_text):
+    def fake_generar(prompt_text, prompt_seed=None, input_img=None):
         return {"message": "ok", "file": "fake.png", "fullPath": "/tmp/fake.png"}
 
     monkeypatch.setattr(imgsvc, 'generar_imagen', fake_generar)

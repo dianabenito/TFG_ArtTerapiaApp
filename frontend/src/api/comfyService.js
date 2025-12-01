@@ -17,7 +17,23 @@ export const comfyService = {
       console.error('createImage error response:', err?.response?.data || err)
       throw err
     }
-    },
+  },
+
+  async generateImageByMultiple(images, count, userId = 2) {
+    try {
+      console.log('generateImageByMultiple called with images:', images, 'and count:', count)
+      // backend expects { data: [{ fileName: '...' }, ...], count: N }
+      const payload = { data: (images?.data ?? images).map(i => ({ fileName: i.fileName || i })), count }
+      console.debug('generateImageByMultiple payload:', payload)
+      const response = await axios.post(`${API_URL}/comfy/users/${userId}/multiple-images/`, payload, {
+        headers: { 'Content-Type': 'application/json' }
+      })
+      return response.data
+    } catch (err) {
+      console.error('generateImageByMultiple error response:', err?.response?.data || err)
+      throw err
+    }
+  },
 
   async uploadImage(file, userId = 2) {
     const form = new FormData()
@@ -28,5 +44,14 @@ export const comfyService = {
     return response.data
   },
 
+  async getImagesForUser(userId = 2) {
+    const response = await axios.get(`${API_URL}/comfy/users/${userId}/images`)
+    return response.data
+  },
 
+  async getTemplateImages() {
+    const response = await axios.get(`${API_URL}/comfy/template-images`)
+    return response.data
+  }
+  
 }
