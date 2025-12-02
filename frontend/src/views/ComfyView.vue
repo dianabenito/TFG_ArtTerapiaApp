@@ -459,6 +459,11 @@ const confirmMultiSelect = async () => {
   }
 }
 
+const drawSketch = async () => {
+  router.push('/canvas/')
+}
+
+
 </script>
 
 <template>
@@ -482,6 +487,7 @@ const confirmMultiSelect = async () => {
       <button @click="openRefineModal()" :disabled="isLoading">Crear con texto</button>
       <button v-if="imageUrl" @click="generateImage(null, imageUrl)" :disabled="isLoading" style="margin-left:.5rem;">Crear a partir de imagen</button>
       <button v-if="imageUrl" @click="createFromSketch(imageUrl)" :disabled="isLoading">Rediseñar boceto</button>
+      <button @click="drawSketch">Dibujar boceto</button>
     </div>
 
     <!-- Upload from gallery -->
