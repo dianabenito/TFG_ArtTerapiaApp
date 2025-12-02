@@ -54,6 +54,7 @@ class Image(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     fileName = Column(String, nullable=False)
+    seed = Column(Integer, nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=True)
 
