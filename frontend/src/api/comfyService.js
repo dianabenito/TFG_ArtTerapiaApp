@@ -19,6 +19,21 @@ export const comfyService = {
     }
   },
 
+  async convertirBoceto(prompt, userId = 2) {
+    try {
+      // log payload for easier debugging
+      console.debug('createImage payload:', prompt)
+      const response = await axios.post(`${API_URL}/comfy/users/${userId}/sketch-images/`, prompt, {
+        headers: { 'Content-Type': 'application/json' }
+      })
+      return response.data
+    } catch (err) {
+      // surface FastAPI validation error body in the client console
+      console.error('createImage error response:', err?.response?.data || err)
+      throw err
+    }
+  },
+
   async generateImageByMultiple(images, count, userId = 2) {
     try {
       console.log('generateImageByMultiple called with images:', images, 'and count:', count)

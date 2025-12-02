@@ -32,6 +32,7 @@ WORKFLOW_IMG2IMG_PATH = BASE_DIR / "workflows" / "sdxl img2img api workflow.json
 WORKFLOW_MULTIMG2_PATH = BASE_DIR / "workflows" / "sdxl twoimgs2img api workflow.json"
 WORKFLOW_MULTIMG3_PATH = BASE_DIR / "workflows" / "sdxl threeimgs2img api workflow.json"
 WORKFLOW_MULTIMG4_PATH = BASE_DIR / "workflows" / "sdxl fourimgs2img api workflow.json"
+WORKFLOW_SKETCH2IMG_PATH = BASE_DIR / "workflows" / "sdxl sketch2img api workflow.json"
 
 # URL de ComfyUI
 COMFYUI_URL = "http://127.0.0.1:8188/prompt"
@@ -148,6 +149,57 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
     workflow["6"]["inputs"]["text"] = prompt_text
     workflow["3"]["inputs"]["seed"] = seed
     workflow["9"]["inputs"]["filename_prefix"] = "generated"
+
+    # Enviar petición a ComfyUI
+    payload = {"prompt": workflow}
+    
+    try:
+        response = requests.post(COMFYUI_URL, json=payload, timeout=300)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Error al comunicarse con ComfyUI: {str(e)}"
+        )
+
+    # Esperar a que se genere la imagen
+    ruta_imagen = esperar_imagen("generated")
+    
+    if ruta_imagen:
+        nombre_archivo = os.path.basename(ruta_imagen)
+        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        return {
+            "message": "Imagen generada correctamente",
+            "file": nombre_archivo,
+            "fullPath": ruta_imagen,
+            "seed": seed
+        }
+    else:
+        raise HTTPException(
+            status_code=408,
+            detail="No se encontró la imagen generada. Tiempo de espera agotado."
+        )
+    
+
+
+def convertir_boceto_imagen(input_img: str) -> dict:
+    with open(WORKFLOW_SKETCH2IMG_PATH, "r",encoding="utf-8") as f:
+            workflow = json.load(f)
+
+    seed = random.randint(0, MAX_SQLITE_INT)
+
+    filename = input_img.rpartition('/')[-1]
+    print(f"Using input image: {filename}")
+
+    origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
+
+    print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+    destino_path = CARPETA_COMFY_INPUT / filename
+    shutil.copy(origin_path, destino_path)
+        
+    workflow["138"]["inputs"]["image"] = filename
+    workflow["128"]["inputs"]["seed"] = seed
+    workflow["132"]["inputs"]["filename_prefix"] = "generated"
 
     # Enviar petición a ComfyUI
     payload = {"prompt": workflow}

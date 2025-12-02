@@ -12,6 +12,7 @@ const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; 
 const role = 'patient'
 
 const prompt = ref({ promptText: '', seed: null, inputImage: null })
+const sketchPrompt = ref({ sketchImage: '' })
 const imageUrl = ref('')
 const tempImageUrl = ref('')
 const seedLastImg = ref(null)
@@ -149,6 +150,42 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     
     // Y COMENTAR ESTA
     const response = await comfyService.createImage(prompt.value, 2)
+    console.log('Imagen generada:', response)
+
+    if (response.file) {
+      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      console.log('Modal image URL:', prompt)
+      seedLastImg.value = response.seed
+      // Refresh gallery to include the newly generated image
+      try {
+        await loadGallery()
+      } catch (e) {
+        console.warn('No se pudo recargar la galería tras generar imagen:', e)
+      }
+    }
+  } catch (e) {
+    // show server-side validation errors if any
+    const detail = e?.response?.data?.detail || e?.message || String(e)
+    showToast('Error generando imagen: ' + detail, { type: 'error' })
+    console.error('Error generating image:', e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const createFromSketch = async(inputImage) => {
+  try {
+    isLoading.value = true
+    imageUrl.value = ''
+
+    sketchPrompt.value.sketchImage = inputImage
+
+    // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
+    // active_user.value = await userService.getCurrentUser()
+    // const response = await comfyService.createImage(prompt.value, active_user.value.id)
+    
+    // Y COMENTAR ESTA
+    const response = await comfyService.convertirBoceto(sketchPrompt.value, 2)
     console.log('Imagen generada:', response)
 
     if (response.file) {
@@ -444,6 +481,7 @@ const confirmMultiSelect = async () => {
     <div style="margin-top: .5rem">
       <button @click="openRefineModal()" :disabled="isLoading">Crear con texto</button>
       <button v-if="imageUrl" @click="generateImage(null, imageUrl)" :disabled="isLoading" style="margin-left:.5rem;">Crear a partir de imagen</button>
+      <button v-if="imageUrl" @click="createFromSketch(imageUrl)" :disabled="isLoading">Rediseñar boceto</button>
     </div>
 
     <!-- Upload from gallery -->
