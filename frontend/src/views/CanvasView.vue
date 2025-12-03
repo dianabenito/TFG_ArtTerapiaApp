@@ -1,4 +1,6 @@
 <script>
+import { comfyService } from '../api/comfyService'
+
 export default {
   name: "CanvasBView",
 
@@ -66,6 +68,33 @@ export default {
       this.savedImage = canvas.toDataURL("image/png");
       // Aquí puedes enviarlo a tu backend si lo quieres almacenar
     },
+    async uploadSavedImage() {
+      if (!this.savedImage) return
+      // convert dataURL to blob
+      const dataurl = this.savedImage
+      const arr = dataurl.split(',')
+      const mime = arr[0].match(/:(.*?);/)[1]
+      const bstr = atob(arr[1])
+      let n = bstr.length
+      const u8arr = new Uint8Array(n)
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n)
+      }
+      const blob = new Blob([u8arr], { type: mime })
+      // create a file-like object
+      const filename = `drawn_${Date.now()}.png`
+      const file = new File([blob], filename, { type: mime })
+
+      try {
+        const resp = await comfyService.uploadDrawnImage(file, 2)
+        // after upload, navigate to Comfy view and pass the image filename as query param
+        const fname = resp.file
+        this.$router.push({ path: '/comfy/', query: { image: fname } })
+      } catch (e) {
+        console.error('Error uploading drawn image', e)
+        alert('Error subiendo el dibujo')
+      }
+    },
   },
 };
 </script>
@@ -91,6 +120,7 @@ export default {
       <button @click="setDraw">Dibujar</button>
       <button @click="clearCanvas">Limpiar</button>
       <button @click="saveImage">Guardar imagen</button>
+      <button @click="(saveImage(), uploadSavedImage())">Guardar y enviar a Comfy</button>
     </div>
 
     <!-- Lienzo -->

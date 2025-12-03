@@ -36,6 +36,12 @@ async def upload_image_for_user(db: SessionDep, user_id: int, file: UploadFile =
     """Endpoint para que el usuario suba una imagen desde su galería."""
     return crud.comfy.create_user_uploaded_image(db=db, upload_file=file, user_id=user_id)
 
+
+@router.post('/users/{user_id}/images/drawn', response_model=schemas.ImageGenerationResponse)
+async def upload_drawn_image_for_user(db: SessionDep, user_id: int, file: UploadFile = File(...)):
+    """Endpoint para guardar un dibujo creado en Canvas."""
+    return crud.comfy.create_user_drawn_image(db=db, upload_file=file, user_id=user_id)
+
 @router.get('/users/{user_id}/images', response_model=schemas.ImagesOut)
 async def get_images_for_user(db: SessionDep, user_id: int):
     """Endpoint para que el usuario suba una imagen desde su galería."""

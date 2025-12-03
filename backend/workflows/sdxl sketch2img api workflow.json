@@ -118,7 +118,7 @@
   },
   "139": {
     "inputs": {
-      "preprocessor": "CannyEdgePreprocessor",
+      "preprocessor": "ScribblePreprocessor",
       "resolution": 1024,
       "image": [
         "138",

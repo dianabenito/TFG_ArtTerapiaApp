@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).parent.parent.parent
 CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
 CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
 CARPETA_TEMPLATES = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "template_images"
+CARPETA_DESTINO_DRAWN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "drawn_images"
 
 CARPETA_COMFY_INPUT = Path(r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input")
 
@@ -246,6 +247,22 @@ def publicar_imagen(upload_file):
         f.write(upload_file.file.read())
 
     return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
+
+
+def publicar_dibujo(upload_file):
+    """Save a drawn image into the drawn_images folder and return metadata."""
+    os.makedirs(str(CARPETA_DESTINO_DRAWN), exist_ok=True)
+
+    original_name = getattr(upload_file, 'filename', 'drawn')
+    ext = os.path.splitext(original_name)[1] or '.png'
+    filename = f"drawn_{uuid.uuid4().hex}{ext}"
+    destino_path = CARPETA_DESTINO_DRAWN / filename
+
+    # write file contents
+    with open(destino_path, 'wb') as f:
+        f.write(upload_file.file.read())
+
+    return {"message": "Dibujo guardado correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
 
 def obtener_imagenes_plantilla():
     try:

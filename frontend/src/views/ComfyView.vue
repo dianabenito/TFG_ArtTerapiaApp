@@ -120,6 +120,14 @@ onMounted(async () => {
 
   connectWs()
   await loadGallery()
+  // If navigated from Canvas with a drawn image, show it
+  const drawn = route.query.image
+  if (drawn) {
+    // drawn images are saved under drawn_images
+    imageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
+    // refresh gallery to include it (in case DB record exists)
+    try { await loadGallery() } catch (e) { /* ignore */ }
+  }
 })
 
 onBeforeUnmount(() => ws?.close())
@@ -371,6 +379,8 @@ const getImageUrl = (fileName) => {
     return `${API_URL}/images/uploaded_images/${fileName}`
   } else if (fileName.startsWith('generated')) {
     return `${API_URL}/images/generated_images/${fileName}`
+  } else if (fileName.startsWith('drawn')) {
+    return `${API_URL}/images/drawn_images/${fileName}`
   } else {
     return `${API_URL}/images/template_images/${fileName}`
   }
