@@ -40,13 +40,12 @@ const selectedImages = ref([])                // array de imágenes seleccionada
 const minMultiSelect = 2
 const maxMultiSelect = 4
 
-
-
 const showGallery = ref(false)
 
 // Refine modal state
 const showRefineModal = ref(false)
 const showImagesModal = ref(false)
+const showDrawModal = ref(false)
 const modalLoading = ref(false)
 
 let ws = null
@@ -125,9 +124,16 @@ onMounted(async () => {
   const drawn = route.query.image
   if (drawn) {
     // drawn images are saved under drawn_images
-    imageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
+    showDrawModal.value = true 
+    tempImageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
+    prompt.value.promptText = localStorage.getItem('prompt')
+    localStorage.removeItem('prompt')
+    await createFromSketch(tempImageUrl.value)
     // refresh gallery to include it (in case DB record exists)
     try { await loadGallery() } catch (e) { /* ignore */ }
+    
+    // Remove 'image' query param to avoid loop
+    router.replace({ query: {} })
   }
 })
 
@@ -185,7 +191,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
 const createFromSketch = async(inputImage) => {
   try {
     isLoading.value = true
-    imageUrl.value = ''
+    tempImageUrl.value = ''
     
     sketchPrompt.value.sketchText = prompt.value.promptText
     sketchPrompt.value.sketchImage = inputImage
@@ -199,7 +205,7 @@ const createFromSketch = async(inputImage) => {
     console.log('Imagen generada:', response)
 
     if (response.file) {
-      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
       console.log('Modal image URL:', prompt)
       seedLastImg.value = response.seed
       // Refresh gallery to include the newly generated image
@@ -263,11 +269,20 @@ const modalTextConfirm = () => {
 
 const modalImagesConfirm = () => {
   // set main view to modal image and seed
-  if (tempImageUrl.value) {
+  if (tempImageUrl.value && tempImageUrl.value !== '') {
     imageUrl.value = tempImageUrl.value
     seedLastImg.value = prompt.value.seed
   }
   showImagesModal.value = false
+}
+
+const modalDrawConfirm = () => {
+  // set main view to modal image and seed
+  if (tempImageUrl.value && tempImageUrl.value !== '') {
+    imageUrl.value = tempImageUrl.value
+    seedLastImg.value = prompt.value.seed
+  }
+  showDrawModal.value = false
 }
 
 const onFileChange = (ev) => {
@@ -301,9 +316,43 @@ const uploadUserImage = async () => {
   }
 }
 
+const uploadAndTransformSketch = async () => {
+  if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
+  try {
+    isLoading.value = true
+    const resp = await comfyService.uploadImage(uploadFile.value, 2)
+    console.log('Imagen subida:', resp)
+    if (resp.file) {
+      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+      seedLastImg.value = resp.seed
+      showToast('Imagen subida correctamente', { type: 'success' })
+      uploadFile.value = null
+      
+      await createFromSketch(tempImageUrl.value)
+      // Refresh gallery to show uploaded image
+      try {
+        await loadGallery()
+      } catch (e) {
+        console.warn('No se pudo recargar la galería tras subir imagen:', e)
+      }
+    }
+  } catch (e) {
+    showToast('Error subiendo imagen', { type: 'error' })
+    console.error(e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
 const openSelectImagesModal = async () => {
   tempImageUrl.value = imageUrl.value
   showImagesModal.value = true
+  modalLoading.value = false
+}
+
+const openDrawModal = async () => {
+  tempImageUrl.value = ''
+  showDrawModal.value = true
   modalLoading.value = false
 }
 
@@ -400,6 +449,7 @@ const openGalleryModal = () => {
   }
   showGallery.value = true
 }
+
 
 const toggleMultiSelectMode = () => {
   multiSelectMode.value = !multiSelectMode.value
@@ -499,8 +549,7 @@ const drawSketch = async () => {
       <h2>Generar una nueva obra:</h2>
       <button @click="openRefineModal()" :disabled="isLoading">Generar a partir de texto</button>
       <button @click="openSelectImagesModal()" :disabled="isLoading">Generar a partir de imágenes</button>
-      <button v-if="imageUrl" @click="createFromSketch(imageUrl)" :disabled="isLoading || !prompt.promptText.trim()">Rediseñar boceto</button>
-      <button @click="drawSketch">Dibujar boceto</button>
+      <button @click="openDrawModal()" :disabled="isLoading">Generar a partir de esbozo</button>
     </div>
 
     <!-- Refine Modal -->
@@ -534,7 +583,6 @@ const drawSketch = async () => {
             <button @click="uploadUserImage" :disabled="isLoadingGallery || !uploadFile" style="margin-left:0.5rem;">
                 {{'Subir imagen' }}
             </button>
-            <div v-if="uploadFile" style="margin-top:.5rem; font-size:.9rem; color:#444;">Seleccionado: {{ uploadFile.name || uploadFile.filename }}</div>
         </div>
         <div>
           <label>Prompt:</label>
@@ -547,6 +595,35 @@ const drawSketch = async () => {
               <button @click="openGalleryModal" :disabled="isLoadingGallery">Ver galería</button>
             </div>
           <button @click="modalImagesConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
+        </div>
+        <div style="margin-top:.75rem;">
+          <div v-if="modalLoading">Generando...</div>
+          <div v-else-if="tempImageUrl">
+            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
+          </div>
+          <div v-else style="color:#666">Aún no hay imagen generada.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawing Modal -->
+    <div v-if="showDrawModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <!-- Upload from gallery -->
+        <div style="margin-top:1rem;">
+            <div>
+              <label>Prompt:</label>
+              <input v-model="prompt.promptText" type="text" style="width:100%;" />
+            </div>
+            <label for="fileInput">Subir esbozo desde galería:</label>
+            <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
+            <button @click="uploadAndTransformSketch" :disabled="isLoadingGallery || !uploadFile  || !prompt.promptText.trim()" style="margin-left:0.5rem;">
+                {{'Subir y transformar esbozo' }}
+            </button>
+        </div>
+        <div style="margin-top:.5rem;">
+          <button @click="drawSketch">Dibujar boceto</button>
+          <button @click="modalDrawConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
         </div>
         <div style="margin-top:.75rem;">
           <div v-if="modalLoading">Generando...</div>
@@ -603,7 +680,7 @@ const drawSketch = async () => {
       </div>
     </div>
     <div>    
-      <button @click="submitImage" style="margin-top:1rem; align-items: right">Enviar al terapeuta</button>
+      <button @click="submitImage" style="margin-top:1rem">Enviar al terapeuta</button>
     </div>
   </div>
 </template>

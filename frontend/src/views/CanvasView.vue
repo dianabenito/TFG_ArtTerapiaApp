@@ -12,6 +12,9 @@ export default {
       size: 5,
       mode: "draw",
       savedImage: null,
+      showConfirmModal: false,
+      promptText: '',
+      modalLoading: false,
     };
   },
 
@@ -48,6 +51,12 @@ export default {
       this.drawing = false;
       this.ctx.closePath();
     },
+
+    openConfirmModal() {
+      this.showConfirmModal = true;
+    },
+
+
 
     clearCanvas() {
       const canvas = this.$refs.canvas;
@@ -95,6 +104,16 @@ export default {
         alert('Error subiendo el dibujo')
       }
     },
+
+    async modalConfirm() {
+      if (this.modalLoading) return
+      this.modalLoading = true
+      localStorage.setItem('prompt', this.promptText)
+      await this.saveImage()
+      await this.uploadSavedImage()
+      this.modalLoading = false
+      this.showConfirmModal = false
+    },
   },
 };
 </script>
@@ -119,8 +138,6 @@ export default {
       <button @click="setErase">Borrar</button>
       <button @click="setDraw">Dibujar</button>
       <button @click="clearCanvas">Limpiar</button>
-      <button @click="saveImage">Guardar imagen</button>
-      <button @click="(saveImage(), uploadSavedImage())">Guardar y enviar a Comfy</button>
     </div>
 
     <!-- Lienzo -->
@@ -135,11 +152,19 @@ export default {
       @mouseleave="stopDrawing"
     ></canvas>
 
-    <!-- Resultado guardado -->
-    <div v-if="savedImage" class="saved-img">
-      <h3>Imagen guardada:</h3>
-      <img :src="savedImage" alt="drawing result">
+    <button @click="openConfirmModal()">Transformar esbozo</button>
+    
+    <!-- Refine Modal -->
+    <div v-if="showConfirmModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <div>
+          <label>Prompt:</label>
+          <input v-model="promptText" type="text" style="width:100%;" />
+        </div>
+          <button @click="modalConfirm" :disabled="!promptText || modalLoading" style="margin-left:.5rem;">Confirmar</button>
+        </div>
     </div>
+
   </div>
 </template>
 
@@ -170,5 +195,33 @@ export default {
   border: 2px solid #333;
   margin-top: 10px;
   max-width: 500px;
+}
+
+/* Modal sizing: limit height and allow scrolling for large images */
+.modal {
+  max-height: 80vh;
+  overflow: auto;
+  color: #000; /* Texto negro por defecto en modal */
+}
+
+.modal div {
+  color: #000; /* Asegura que todo el texto en divs sea negro */
+}
+
+.modal label {
+  color: #000; /* Labels negros */
+}
+
+.modal input {
+  color: #000; /* Input text negra */
+}
+
+.modal img {
+  max-width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
 }
 </style>

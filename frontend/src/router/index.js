@@ -9,14 +9,13 @@ import GenerationView from '../views/GenerationView.vue'
 
 const routes = [
   { path: '/', component: UsersView },
-  { path: '/comfy/', component: ComfyView },
   { path: '/therapist/', component: TherapistGenerationView },
   { path: '/login/', component: LoginView },
   { path: '/home/', component: HomeView },
   { path: '/canvas/', component: CanvasView },
   { path: '/generation/', component: GenerationView },
   // session-specific routes (use sessionId param)
-  { path: '/session/:sessionId/patient', component: ComfyView, props: true },
+  { path: '/session/:sessionId/patient', component: GenerationView, props: true },
   { path: '/session/:sessionId/therapist', component: TherapistGenerationView, props: true },
 ]
 
