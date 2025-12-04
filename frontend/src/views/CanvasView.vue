@@ -89,7 +89,7 @@ export default {
         const resp = await comfyService.uploadDrawnImage(file, 2)
         // after upload, navigate to Comfy view and pass the image filename as query param
         const fname = resp.file
-        this.$router.push({ path: '/comfy/', query: { image: fname } })
+        this.$router.push({ path: '/generation/', query: { image: fname } })
       } catch (e) {
         console.error('Error uploading drawn image', e)
         alert('Error subiendo el dibujo')
