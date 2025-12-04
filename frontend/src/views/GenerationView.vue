@@ -160,12 +160,9 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     }
 
     // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
-    // active_user.value = await userService.getCurrentUser()
-    // const response = await comfyService.createImage(prompt.value, active_user.value.id)
+    active_user.value = await userService.getCurrentUser()
+    const response = await comfyService.createImage(prompt.value, active_user.value.id)
     
-    // Y COMENTAR ESTA
-    const response = await comfyService.createImage(prompt.value, 2)
-    console.log('Imagen generada:', response)
 
     if (response.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
@@ -196,12 +193,8 @@ const createFromSketch = async(inputImage) => {
     sketchPrompt.value.sketchText = prompt.value.promptText
     sketchPrompt.value.sketchImage = inputImage
 
-    // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
-    // active_user.value = await userService.getCurrentUser()
-    // const response = await comfyService.createImage(prompt.value, active_user.value.id)
-    
-    // Y COMENTAR ESTA
-    const response = await comfyService.convertirBoceto(sketchPrompt.value, 2)
+    active_user.value = await userService.getCurrentUser()
+    const response = await comfyService.convertirBoceto(sketchPrompt.value, active_user.value.id)
     console.log('Imagen generada:', response)
 
     if (response.file) {
@@ -238,7 +231,9 @@ const modalRegenerate = async () => {
     modalLoading.value = true
     // keep the same seed if present (pass the primitive value, not the ref)
     const seedToUse = prompt.value.seed ?? null
-    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, 2)
+
+    active_user.value = await userService.getCurrentUser()
+    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, active_user.value.id)
     console.log('Modal regenerate:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${resp.file}`
@@ -294,7 +289,8 @@ const uploadUserImage = async () => {
   if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
   try {
     isLoading.value = true
-    const resp = await comfyService.uploadImage(uploadFile.value, 2)
+    active_user.value = await userService.getCurrentUser()
+    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
     console.log('Imagen subida:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
@@ -320,7 +316,8 @@ const uploadAndTransformSketch = async () => {
   if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
   try {
     isLoading.value = true
-    const resp = await comfyService.uploadImage(uploadFile.value, 2)
+    active_user.value = await userService.getCurrentUser()
+    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
     console.log('Imagen subida:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
@@ -381,7 +378,8 @@ const loadGallery = async () => {
     isLoadingGallery.value = true
 
     // 1. Cargar imágenes del usuario
-    const resp = await comfyService.getImagesForUser()
+    active_user.value = await userService.getCurrentUser()
+    const resp = await comfyService.getImagesForUser(active_user.value.id)
     const userImages = resp.data ?? resp.images ?? []
 
     const generated = userImages.filter(img => img.fileName.startsWith("generated"))
@@ -489,12 +487,8 @@ const confirmMultiSelect = async () => {
       data: selectedImages.value.map(img => ({ fileName: img.fileName }))
     }
 
-    // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
-    // active_user.value = await userService.getCurrentUser()
-    // const response = await comfyService.createImageByMultipleImages(imagesPayload, active_user.value.id)
-    
-    // Y COMENTAR ESTA
-    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length)
+    active_user.value = await userService.getCurrentUser()
+    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id)
     console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
@@ -517,7 +511,12 @@ const confirmMultiSelect = async () => {
 }
 
 const drawSketch = async () => {
-  router.push('/canvas/')
+  // Preserve sessionId if we're in a session context
+  if (Number.isFinite(sessionId)) {
+    router.push(`/session/${sessionId}/patient/canvas`)
+  } else {
+    router.push('/canvas/')
+  }
 }
 
 

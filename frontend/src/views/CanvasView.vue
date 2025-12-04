@@ -1,5 +1,6 @@
 <script>
 import { comfyService } from '../api/comfyService'
+import { userService } from '../api/userService'
 
 export default {
   name: "CanvasBView",
@@ -15,6 +16,7 @@ export default {
       showConfirmModal: false,
       promptText: '',
       modalLoading: false,
+      sessionId: null,
     };
   },
 
@@ -25,6 +27,12 @@ export default {
     // Fondo blanco para poder guardar
     this.ctx.fillStyle = "#FFFFFF";
     this.ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Capture sessionId from route params if present
+    this.sessionId = Number(this.$route.params.sessionId)
+    if (!Number.isFinite(this.sessionId)) {
+      this.sessionId = null
+    }
   },
 
   methods: {
@@ -95,10 +103,20 @@ export default {
       const file = new File([blob], filename, { type: mime })
 
       try {
-        const resp = await comfyService.uploadDrawnImage(file, 2)
-        // after upload, navigate to Comfy view and pass the image filename as query param
+        const active_user = await userService.getCurrentUser()
+        const resp = await comfyService.uploadDrawnImage(file, active_user.id)
+        // after upload, navigate back to Generation view preserving sessionId
         const fname = resp.file
-        this.$router.push({ path: '/generation/', query: { image: fname } })
+        
+        // Preserve session context when navigating back
+        if (this.sessionId) {
+          this.$router.push({ 
+            path: `/session/${this.sessionId}/patient`, 
+            query: { image: fname } 
+          })
+        } else {
+          this.$router.push({ path: '/generation/', query: { image: fname } })
+        }
       } catch (e) {
         console.error('Error uploading drawn image', e)
         alert('Error subiendo el dibujo')
@@ -121,6 +139,10 @@ export default {
 <template>
   <div class="canvas-wrapper">
     <h2>Editor de dibujo</h2>
+    
+    <div v-if="sessionId" style="background: #e3f2fd; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;">
+      <strong>Sesión activa ID: {{ sessionId }}</strong>
+    </div>
 
     <!-- Controles -->
     <div class="controls">

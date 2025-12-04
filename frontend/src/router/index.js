@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import UsersView from '../views/TempView.vue'
-import ComfyView from '../views/ComfyView.vue'
 import TherapistGenerationView from '../views/TherapistGenerationView.vue'
 import LoginView from '../views/LoginView.vue'
 import HomeView from '../views/HomeView.vue'
@@ -16,6 +15,7 @@ const routes = [
   { path: '/generation/', component: GenerationView },
   // session-specific routes (use sessionId param)
   { path: '/session/:sessionId/patient', component: GenerationView, props: true },
+  { path: '/session/:sessionId/patient/canvas', component: CanvasView, props: true },
   { path: '/session/:sessionId/therapist', component: TherapistGenerationView, props: true },
 ]
 
