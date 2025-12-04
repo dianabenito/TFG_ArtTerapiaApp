@@ -40,3 +40,7 @@ class ImageTemplate(BaseModel):
 class TemplateImagesIn(BaseModel):
     data: list[ImageTemplate]
     count: int
+
+class SketchPrompt(BaseModel):
+    sketchImage: str
+    sketchText: str

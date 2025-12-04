@@ -14,6 +14,14 @@ async def generate_image_for_user(db: SessionDep, user_id: int, prompt: schemas.
     db_user = crud.user.get_user(db, user_id=user_id)
     return crud.comfy.create_user_image(db=db, prompt=prompt, user_id=user_id)
 
+@router.post("/users/{user_id}/sketch-images/", response_model=schemas.ImageGenerationResponse)
+async def generate_sketch_image_for_user(db: SessionDep, user_id: int, prompt: schemas.SketchPrompt):
+    """
+    Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
+    """
+    db_user = crud.user.get_user(db, user_id=user_id)
+    return crud.comfy.create_user_sketch_image(db=db, prompt=prompt, user_id=user_id)
+
 @router.post("/users/{user_id}/multiple-images/", response_model=schemas.ImageGenerationResponse)
 async def generate_image_for_user(db: SessionDep, user_id: int, images: schemas.TemplateImagesIn):
     """
@@ -27,6 +35,12 @@ async def generate_image_for_user(db: SessionDep, user_id: int, images: schemas.
 async def upload_image_for_user(db: SessionDep, user_id: int, file: UploadFile = File(...)):
     """Endpoint para que el usuario suba una imagen desde su galería."""
     return crud.comfy.create_user_uploaded_image(db=db, upload_file=file, user_id=user_id)
+
+
+@router.post('/users/{user_id}/images/drawn', response_model=schemas.ImageGenerationResponse)
+async def upload_drawn_image_for_user(db: SessionDep, user_id: int, file: UploadFile = File(...)):
+    """Endpoint para guardar un dibujo creado en Canvas."""
+    return crud.comfy.create_user_drawn_image(db=db, upload_file=file, user_id=user_id)
 
 @router.get('/users/{user_id}/images', response_model=schemas.ImagesOut)
 async def get_images_for_user(db: SessionDep, user_id: int):
