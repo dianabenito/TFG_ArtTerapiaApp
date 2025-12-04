@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import HTTPException
 import uuid
 from pathlib import Path
+from translate import Translator
 
 # Carpeta externa donde se generan las imágenes
 CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output"
@@ -134,6 +135,9 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
         seed = prompt_seed
     else:
         seed = random.randint(0, MAX_SQLITE_INT)
+    
+    translator= Translator(from_lang="es", to_lang="en")
+    prompt_text = translator.translate(prompt_text)
 
     if(input_img):
         filename = input_img.rpartition('/')[-1]
@@ -183,7 +187,7 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
     
 
 
-def convertir_boceto_imagen(input_img: str) -> dict:
+def convertir_boceto_imagen(input_img: str, input_text: str) -> dict:
     with open(WORKFLOW_SKETCH2IMG_PATH, "r",encoding="utf-8") as f:
             workflow = json.load(f)
 
@@ -197,7 +201,11 @@ def convertir_boceto_imagen(input_img: str) -> dict:
     print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
     destino_path = CARPETA_COMFY_INPUT / filename
     shutil.copy(origin_path, destino_path)
-        
+
+    translator= Translator(from_lang="es", to_lang="en")
+    input_text = translator.translate(input_text)
+
+    workflow["199"]["inputs"]["text_positive"] = input_text 
     workflow["138"]["inputs"]["image"] = filename
     workflow["128"]["inputs"]["seed"] = seed
     workflow["132"]["inputs"]["filename_prefix"] = "generated"

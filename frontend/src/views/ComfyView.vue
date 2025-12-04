@@ -185,7 +185,8 @@ const createFromSketch = async(inputImage) => {
   try {
     isLoading.value = true
     imageUrl.value = ''
-
+    
+    sketchPrompt.value.sketchText = prompt.value.promptText
     sketchPrompt.value.sketchImage = inputImage
 
     // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
@@ -494,9 +495,9 @@ const drawSketch = async () => {
     </div>
     <input v-model="prompt.promptText" type="text" placeholder="Describe tu imagen" />
     <div style="margin-top: .5rem">
-      <button @click="openRefineModal()" :disabled="isLoading">Crear con texto</button>
-      <button v-if="imageUrl" @click="generateImage(null, imageUrl)" :disabled="isLoading" style="margin-left:.5rem;">Crear a partir de imagen</button>
-      <button v-if="imageUrl" @click="createFromSketch(imageUrl)" :disabled="isLoading">Rediseñar boceto</button>
+      <button @click="openRefineModal()" :disabled="isLoading || !prompt.promptText.trim()">Crear con texto</button>
+      <button v-if="imageUrl" @click="generateImage(null, imageUrl)" :disabled="isLoading || !prompt.promptText.trim()" style="margin-left:.5rem;">Crear a partir de imagen</button>
+      <button v-if="imageUrl" @click="createFromSketch(imageUrl)" :disabled="isLoading || !prompt.promptText.trim()">Rediseñar boceto</button>
       <button @click="drawSketch">Dibujar boceto</button>
     </div>
 

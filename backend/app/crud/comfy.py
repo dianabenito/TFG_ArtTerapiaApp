@@ -22,7 +22,7 @@ def create_user_sketch_image(db: Session, prompt: schemas.SketchPrompt, user_id:
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user.type != 'patient':
         raise HTTPException(status_code=404, detail="Therapists cannot have images")
-    image = services.image_generation.convertir_boceto_imagen(prompt.sketchImage)
+    image = services.image_generation.convertir_boceto_imagen(prompt.sketchImage, prompt.sketchText)
     gen_seed = image.get("seed") if isinstance(image, dict) else None
     db_image = models.Image(fileName=image["file"], seed=gen_seed, owner_id=user_id)
     db.add(db_image)

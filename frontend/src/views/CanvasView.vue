@@ -126,7 +126,7 @@ export default {
     <!-- Lienzo -->
     <canvas
       ref="canvas"
-      width="800"
+      width="500"
       height="500"
       class="drawing-canvas"
       @mousedown="startDrawing"
@@ -169,6 +169,6 @@ export default {
 .saved-img img {
   border: 2px solid #333;
   margin-top: 10px;
-  max-width: 800px;
+  max-width: 500px;
 }
 </style>

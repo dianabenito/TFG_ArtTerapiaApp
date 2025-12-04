@@ -43,3 +43,4 @@ class TemplateImagesIn(BaseModel):
 
 class SketchPrompt(BaseModel):
     sketchImage: str
+    sketchText: str
