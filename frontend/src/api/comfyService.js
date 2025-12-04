@@ -59,6 +59,15 @@ export const comfyService = {
     return response.data
   },
 
+  async uploadDrawnImage(file, userId = 2) {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await axios.post(`${API_URL}/comfy/users/${userId}/images/drawn`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
+
   async getImagesForUser(userId = 2) {
     const response = await axios.get(`${API_URL}/comfy/users/${userId}/images`)
     return response.data

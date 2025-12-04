@@ -252,7 +252,7 @@
   "22": {
     "inputs": {
       "text_positive": "",
-      "text_negative": "",
+      "text_negative": "ugly, watermark, NSFW",
       "style_file": "basic.yaml",
       "template_name": "Digital Painting"
     },

@@ -1,7 +1,7 @@
 {
   "3": {
     "inputs": {
-      "seed": 19903168861422,
+      "seed": 775907480172399,
       "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
@@ -40,7 +40,10 @@
   },
   "6": {
     "inputs": {
-      "text": "closeup portait of a sci-fi warrior bunny robot, rusty metal, mech, cinematic, red eyes, dark interior background, movie scene, sharp, rim light, epic, golden hour",
+      "text": [
+        "17",
+        0
+      ],
       "clip": [
         "4",
         1
@@ -53,7 +56,10 @@
   },
   "7": {
     "inputs": {
-      "text": "ugly, watermark",
+      "text": [
+        "17",
+        1
+      ],
       "clip": [
         "4",
         1
@@ -105,8 +111,8 @@
   "11": {
     "inputs": {
       "upscale_method": "lanczos",
-      "width": 1024,
-      "height": 1024,
+      "width": 512,
+      "height": 512,
       "crop": "disabled",
       "image": [
         "10",
@@ -144,6 +150,18 @@
     "class_type": "PreviewImage",
     "_meta": {
       "title": "Vista previa de imagen"
+    }
+  },
+  "17": {
+    "inputs": {
+      "text_positive": "",
+      "text_negative": "ugly, watermark, NSFW",
+      "style_file": "basic.yaml",
+      "template_name": "Digital Painting"
+    },
+    "class_type": "iToolsPromptStyler",
+    "_meta": {
+      "title": "iTools Prompt Styler 🖌️"
     }
   }
 }

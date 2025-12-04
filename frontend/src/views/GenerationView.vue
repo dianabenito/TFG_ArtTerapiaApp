@@ -40,12 +40,12 @@ const selectedImages = ref([])                // array de imágenes seleccionada
 const minMultiSelect = 2
 const maxMultiSelect = 4
 
-
-
 const showGallery = ref(false)
 
 // Refine modal state
 const showRefineModal = ref(false)
+const showImagesModal = ref(false)
+const showDrawModal = ref(false)
 const modalLoading = ref(false)
 
 let ws = null
@@ -124,9 +124,16 @@ onMounted(async () => {
   const drawn = route.query.image
   if (drawn) {
     // drawn images are saved under drawn_images
-    imageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
+    showDrawModal.value = true 
+    tempImageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
+    prompt.value.promptText = localStorage.getItem('prompt')
+    localStorage.removeItem('prompt')
+    await createFromSketch(tempImageUrl.value)
     // refresh gallery to include it (in case DB record exists)
     try { await loadGallery() } catch (e) { /* ignore */ }
+    
+    // Remove 'image' query param to avoid loop
+    router.replace({ query: {} })
   }
 })
 
@@ -135,7 +142,7 @@ onBeforeUnmount(() => ws?.close())
 const generateImage = async (last_seed = null, inputImage = null) => {
   try {
     isLoading.value = true
-    imageUrl.value = ''
+    tempImageUrl.value = ''
 
     // Only accept numeric seeds; ignore click events or other objects
     if (typeof last_seed === 'number') {
@@ -161,7 +168,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     console.log('Imagen generada:', response)
 
     if (response.file) {
-      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
       console.log('Modal image URL:', prompt)
       seedLastImg.value = response.seed
       // Refresh gallery to include the newly generated image
@@ -184,7 +191,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
 const createFromSketch = async(inputImage) => {
   try {
     isLoading.value = true
-    imageUrl.value = ''
+    tempImageUrl.value = ''
     
     sketchPrompt.value.sketchText = prompt.value.promptText
     sketchPrompt.value.sketchImage = inputImage
@@ -198,7 +205,7 @@ const createFromSketch = async(inputImage) => {
     console.log('Imagen generada:', response)
 
     if (response.file) {
-      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
       console.log('Modal image URL:', prompt)
       seedLastImg.value = response.seed
       // Refresh gallery to include the newly generated image
@@ -222,28 +229,7 @@ const createFromSketch = async(inputImage) => {
 const openRefineModal = async () => {
   showRefineModal.value = true
   prompt.value.seed = null
-  // generate initial image to obtain a seed
-  try {
-    modalLoading.value = true
-    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: null }, 2)
-    console.log('Modal initial generation:', resp)
-    if (resp.file) {
-      tempImageUrl.value = `${API_URL}/images/generated_images/${resp.file}`
-      console.log('Modal image URL:', prompt)
-      prompt.value.seed = resp.seed
-      // Refresh gallery to include this new image
-      try {
-        await loadGallery()
-      } catch (e) {
-        console.warn('No se pudo recargar la galería tras generación en modal:', e)
-      }
-    }
-  } catch (e) {
-    showToast('Error generando imagen en el modal: ' + (e?.response?.data?.detail || e?.message || String(e)), { type: 'error' })
-    console.error('Modal generation error:', e)
-  } finally {
-    modalLoading.value = false
-  }
+  modalLoading.value = false
 }
 
 const modalRegenerate = async () => {
@@ -272,13 +258,31 @@ const modalRegenerate = async () => {
   }
 }
 
-const modalConfirm = () => {
+const modalTextConfirm = () => {
   // set main view to modal image and seed
   if (tempImageUrl.value) {
     imageUrl.value = tempImageUrl.value
     seedLastImg.value = prompt.value.seed
   }
   showRefineModal.value = false
+}
+
+const modalImagesConfirm = () => {
+  // set main view to modal image and seed
+  if (tempImageUrl.value && tempImageUrl.value !== '') {
+    imageUrl.value = tempImageUrl.value
+    seedLastImg.value = prompt.value.seed
+  }
+  showImagesModal.value = false
+}
+
+const modalDrawConfirm = () => {
+  // set main view to modal image and seed
+  if (tempImageUrl.value && tempImageUrl.value !== '') {
+    imageUrl.value = tempImageUrl.value
+    seedLastImg.value = prompt.value.seed
+  }
+  showDrawModal.value = false
 }
 
 const onFileChange = (ev) => {
@@ -293,7 +297,7 @@ const uploadUserImage = async () => {
     const resp = await comfyService.uploadImage(uploadFile.value, 2)
     console.log('Imagen subida:', resp)
     if (resp.file) {
-      imageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
       seedLastImg.value = resp.seed
       showToast('Imagen subida correctamente', { type: 'success' })
       uploadFile.value = null
@@ -311,6 +315,47 @@ const uploadUserImage = async () => {
     isLoading.value = false
   }
 }
+
+const uploadAndTransformSketch = async () => {
+  if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
+  try {
+    isLoading.value = true
+    const resp = await comfyService.uploadImage(uploadFile.value, 2)
+    console.log('Imagen subida:', resp)
+    if (resp.file) {
+      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+      seedLastImg.value = resp.seed
+      showToast('Imagen subida correctamente', { type: 'success' })
+      uploadFile.value = null
+      
+      await createFromSketch(tempImageUrl.value)
+      // Refresh gallery to show uploaded image
+      try {
+        await loadGallery()
+      } catch (e) {
+        console.warn('No se pudo recargar la galería tras subir imagen:', e)
+      }
+    }
+  } catch (e) {
+    showToast('Error subiendo imagen', { type: 'error' })
+    console.error(e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const openSelectImagesModal = async () => {
+  tempImageUrl.value = imageUrl.value
+  showImagesModal.value = true
+  modalLoading.value = false
+}
+
+const openDrawModal = async () => {
+  tempImageUrl.value = ''
+  showDrawModal.value = true
+  modalLoading.value = false
+}
+
 
 // Enviar la imagen al terapeuta
 const submitImage = () => {
@@ -389,10 +434,10 @@ const getImageUrl = (fileName) => {
 
 // Función para seleccionar imagen desde la galería
 const selectImage = (img) => {
-  imageUrl.value = getImageUrl(img.fileName)
+  tempImageUrl.value = getImageUrl(img.fileName)
   seedLastImg.value = img.seed
   showToast("Imagen seleccionada de la galería", { type: "success" })
-  console.log('Imagen seleccionada:', imageUrl.value)
+  console.log('Imagen seleccionada:', tempImageUrl.value)
   showGallery.value = false
 }
 
@@ -404,6 +449,7 @@ const openGalleryModal = () => {
   }
   showGallery.value = true
 }
+
 
 const toggleMultiSelectMode = () => {
   multiSelectMode.value = !multiSelectMode.value
@@ -436,7 +482,7 @@ const confirmMultiSelect = async () => {
 
   try {
     isLoading.value = true
-    imageUrl.value = ''
+    tempImageUrl.value = ''
 
     // Preparar payload para el servicio
     const imagesPayload = {
@@ -452,8 +498,8 @@ const confirmMultiSelect = async () => {
     console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
-      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
-      console.log('Imagen generada URL:', imageUrl.value)
+      tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      console.log('Imagen generada URL:', tempImageUrl.value)
       seedLastImg.value = response.seed
       // Refresh gallery to include the new image generated from multiple images
       try {
@@ -487,33 +533,106 @@ const drawSketch = async () => {
       <p>Generando imagen...</p>
     </div>
 
-    <h1>Generar imagen con ComfyUI</h1>
+    <h1>Genera tu obra de Arteterapia</h1>
 
     <div v-if="sessionInfo">
       <p><strong>Sesión ID:</strong> {{ sessionInfo.id }}</p>
       <p><strong>Estado:</strong> {{ sessionInfo.ended_at ? 'Finalizada' : 'Activa' }}</p>
     </div>
-    <input v-model="prompt.promptText" type="text" placeholder="Describe tu imagen" />
+
+    <div v-if="imageUrl">
+      <h2>Imagen generada:</h2>
+      <img :src="imageUrl" alt="Imagen generada" class="main-image" />
+    </div>
+
     <div style="margin-top: .5rem">
-      <button @click="openRefineModal()" :disabled="isLoading || !prompt.promptText.trim()">Crear con texto</button>
-      <button v-if="imageUrl" @click="generateImage(null, imageUrl)" :disabled="isLoading || !prompt.promptText.trim()" style="margin-left:.5rem;">Crear a partir de imagen</button>
-      <button v-if="imageUrl" @click="createFromSketch(imageUrl)" :disabled="isLoading || !prompt.promptText.trim()">Rediseñar boceto</button>
-      <button @click="drawSketch">Dibujar boceto</button>
+      <h2>Generar una nueva obra:</h2>
+      <button @click="openRefineModal()" :disabled="isLoading">Generar a partir de texto</button>
+      <button @click="openSelectImagesModal()" :disabled="isLoading">Generar a partir de imágenes</button>
+      <button @click="openDrawModal()" :disabled="isLoading">Generar a partir de esbozo</button>
     </div>
 
-    <!-- Upload from gallery -->
-    <div style="margin-top:1rem;">
-      <label for="fileInput">Subir imagen desde galería:</label>
-      <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
-      <button @click="uploadUserImage" :disabled="isLoadingGallery || !uploadFile" style="margin-left:0.5rem;">
-        {{'Subir imagen' }}
-      </button>
-      <div v-if="uploadFile" style="margin-top:.5rem; font-size:.9rem; color:#444;">Seleccionado: {{ uploadFile.name || uploadFile.filename }}</div>
+    <!-- Refine Modal -->
+    <div v-if="showRefineModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <div>
+          <label>Prompt:</label>
+          <input v-model="prompt.promptText" type="text" style="width:100%;" />
+        </div>
+        <div style="margin-top:.5rem;">
+          <button @click="modalRegenerate" :disabled="modalLoading || !prompt.promptText.trim()">Crear con texto</button>
+          <button @click="modalTextConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
+        </div>
+        <div style="margin-top:.75rem;">
+          <div v-if="modalLoading">Generando...</div>
+          <div v-else-if="tempImageUrl">
+            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
+          </div>
+          <div v-else style="color:#666">Aún no hay imagen generada.</div>
+        </div>
+      </div>
     </div>
 
-        <!-- Botón para abrir la galería -->
-    <div>
-      <button @click="openGalleryModal" :disabled="isLoadingGallery">Ver galería</button>
+    <!-- Images Modal -->
+    <div v-if="showImagesModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <!-- Upload from gallery -->
+        <div style="margin-top:1rem;">
+            <label for="fileInput">Subir imagen desde galería:</label>
+            <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
+            <button @click="uploadUserImage" :disabled="isLoadingGallery || !uploadFile" style="margin-left:0.5rem;">
+                {{'Subir imagen' }}
+            </button>
+        </div>
+        <div>
+          <label>Prompt:</label>
+          <input v-model="prompt.promptText" type="text" style="width:100%;" />
+        </div>
+        <div style="margin-top:.5rem;">
+          <button v-if="tempImageUrl" @click="generateImage(null, tempImageUrl)" :disabled="isLoading || !prompt.promptText.trim()" style="margin-left:.5rem;">Crear añadiendo texto a la imagen</button>
+            <div>
+              Crear usando imágenes de la galería:
+              <button @click="openGalleryModal" :disabled="isLoadingGallery">Ver galería</button>
+            </div>
+          <button @click="modalImagesConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
+        </div>
+        <div style="margin-top:.75rem;">
+          <div v-if="modalLoading">Generando...</div>
+          <div v-else-if="tempImageUrl">
+            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
+          </div>
+          <div v-else style="color:#666">Aún no hay imagen generada.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawing Modal -->
+    <div v-if="showDrawModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
+      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <!-- Upload from gallery -->
+        <div style="margin-top:1rem;">
+            <div>
+              <label>Prompt:</label>
+              <input v-model="prompt.promptText" type="text" style="width:100%;" />
+            </div>
+            <label for="fileInput">Subir esbozo desde galería:</label>
+            <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
+            <button @click="uploadAndTransformSketch" :disabled="isLoadingGallery || !uploadFile  || !prompt.promptText.trim()" style="margin-left:0.5rem;">
+                {{'Subir y transformar esbozo' }}
+            </button>
+        </div>
+        <div style="margin-top:.5rem;">
+          <button @click="drawSketch">Dibujar boceto</button>
+          <button @click="modalDrawConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
+        </div>
+        <div style="margin-top:.75rem;">
+          <div v-if="modalLoading">Generando...</div>
+          <div v-else-if="tempImageUrl">
+            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
+          </div>
+          <div v-else style="color:#666">Aún no hay imagen generada.</div>
+        </div>
+      </div>
     </div>
 
     <!-- Galería modal -->
@@ -560,40 +679,13 @@ const drawSketch = async () => {
         </div>
       </div>
     </div>
-
-
-
-    <!-- Refine Modal -->
-    <div v-if="showRefineModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
-      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
-        <div>
-          <label>Prompt:</label>
-          <input v-model="prompt.promptText" type="text" style="width:100%;" />
-        </div>
-        <div style="margin-top:.5rem;">
-          <button @click="modalRegenerate" :disabled="modalLoading">Modificar imagen creada</button>
-          <button @click="modalConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
-        </div>
-        <div style="margin-top:.75rem;">
-          <div v-if="modalLoading">Generando...</div>
-          <div v-else-if="tempImageUrl">
-            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
-          </div>
-          <div v-else style="color:#666">Aún no hay imagen generada.</div>
-        </div>
-      </div>
+    <div>    
+      <button @click="submitImage" style="margin-top:1rem">Enviar al terapeuta</button>
     </div>
-
-    <div v-if="imageUrl">
-      <h2>Imagen generada:</h2>
-      <img :src="imageUrl" alt="Imagen generada" style="max-width: 100%; height: auto;" />
-      <button @click="submitImage" style="margin-top:1rem;">Enviar al terapeuta</button>
-    </div>
-
   </div>
 </template>
 
-<style>
+<style scoped>
 .loading-overlay {
   position: fixed;
   top: 0; left: 0;
@@ -628,5 +720,43 @@ const drawSketch = async () => {
   border-radius: 6px;
 }
 
+/* Main image display: consistent sizing regardless of resolution */
+.main-image {
+  max-width: 100%;
+  max-height: 60vh;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 1rem auto;
+}
+
+
+/* Modal sizing: limit height and allow scrolling for large images */
+.modal {
+  max-height: 80vh;
+  overflow: auto;
+  color: #000; /* Texto negro por defecto en modal */
+}
+
+.modal div {
+  color: #000; /* Asegura que todo el texto en divs sea negro */
+}
+
+.modal label {
+  color: #000; /* Labels negros */
+}
+
+.modal input {
+  color: #000; /* Input text negra */
+}
+
+.modal img {
+  max-width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
 
 </style>
