@@ -125,11 +125,13 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
     """
     
     if(input_img):
-        with open(WORKFLOW_IMG2IMG_PATH, "r") as f:
+        with open(WORKFLOW_IMG2IMG_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
+            workflow["17"]["inputs"]["text_positive"] = prompt_text
     else:
-        with open(WORKFLOW_TXT2IMG_PATH, "r") as f:
+        with open(WORKFLOW_TXT2IMG_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
+            workflow["11"]["inputs"]["text_positive"] = prompt_text
 
     if(prompt_seed):
         seed = prompt_seed
@@ -151,7 +153,6 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
             
         workflow["10"]["inputs"]["image"] = filename
 
-    workflow["6"]["inputs"]["text"] = prompt_text
     workflow["3"]["inputs"]["seed"] = seed
     workflow["9"]["inputs"]["filename_prefix"] = "generated"
 

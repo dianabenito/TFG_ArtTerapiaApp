@@ -1,7 +1,7 @@
 {
   "128": {
     "inputs": {
-      "seed": 923547874024958,
+      "seed": 569102554892694,
       "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
@@ -81,7 +81,7 @@
     "inputs": {
       "filename_prefix": "Img",
       "images": [
-        "131",
+        "200",
         0
       ]
     },
@@ -202,12 +202,12 @@
           {
             "name": "A",
             "selected": true,
-            "url": "/api/view?filename=rgthree.compare._temp_jokry_00003_.png&type=temp&subfolder=&rand=0.2799179778598335"
+            "url": "/api/view?filename=rgthree.compare._temp_afjap_00003_.png&type=temp&subfolder=&rand=0.7050325218395719"
           },
           {
             "name": "B",
             "selected": true,
-            "url": "/api/view?filename=rgthree.compare._temp_jokry_00004_.png&type=temp&subfolder=&rand=0.3972647212271422"
+            "url": "/api/view?filename=rgthree.compare._temp_afjap_00004_.png&type=temp&subfolder=&rand=0.8842066758437302"
           }
         ]
       },
@@ -227,7 +227,7 @@
   },
   "157": {
     "inputs": {
-      "ckpt_name": "artUniverse_v70SDXL.safetensors"
+      "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -246,13 +246,29 @@
   "199": {
     "inputs": {
       "text_positive": "",
-      "text_negative": "",
+      "text_negative": "ugly, watermark, NSFW",
       "style_file": "basic.yaml",
       "template_name": "Digital Painting"
     },
     "class_type": "iToolsPromptStyler",
     "_meta": {
       "title": "iTools Prompt Styler 🖌️"
+    }
+  },
+  "200": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "width": 512,
+      "height": 512,
+      "crop": "disabled",
+      "image": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Ampliar Imagen"
     }
   }
 }

@@ -1,7 +1,7 @@
 {
   "3": {
     "inputs": {
-      "seed": 804639666562571,
+      "seed": 90970036335771,
       "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
@@ -51,7 +51,10 @@
   },
   "6": {
     "inputs": {
-      "text": "closeup portrait of a sci-fi warrior robot, rusty metal, mech, cinematic, red eyes, dark interior background, movie scene, sharp, rim light, epic, golden hour",
+      "text": [
+        "11",
+        0
+      ],
       "clip": [
         "4",
         1
@@ -64,7 +67,10 @@
   },
   "7": {
     "inputs": {
-      "text": "ugly, watermark, NSFW",
+      "text": [
+        "11",
+        1
+      ],
       "clip": [
         "4",
         1
@@ -102,6 +108,18 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "Guardar Imagen"
+    }
+  },
+  "11": {
+    "inputs": {
+      "text_positive": "a sci-fi warrior bunny robot",
+      "text_negative": "ugly, watermark, NSFW",
+      "style_file": "basic.yaml",
+      "template_name": "Digital Painting"
+    },
+    "class_type": "iToolsPromptStyler",
+    "_meta": {
+      "title": "iTools Prompt Styler 🖌️"
     }
   }
 }
