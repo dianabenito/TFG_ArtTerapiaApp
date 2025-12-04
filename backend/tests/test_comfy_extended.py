@@ -178,3 +178,245 @@ def test_multiple_images_malformed_payload(client):
     malformed = {"count": 2}
     r = client.post(f'/comfy/users/{uid}/multiple-images/', json=malformed)
     assert r.status_code == 422
+
+
+# ===== SKETCH/BOCETO TESTS =====
+
+def test_generate_sketch_image_success(client, monkeypatch):
+    """Test successful sketch-to-image conversion"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    recorded = {}
+
+    def fake_convertir_boceto(input_img, input_text):
+        recorded['input_img'] = input_img
+        recorded['input_text'] = input_text
+        return {
+            "message": "ok",
+            "file": "generated_sketch_123.png",
+            "fullPath": "/tmp/generated_sketch_123.png",
+            "seed": 7777
+        }
+
+    monkeypatch.setattr(imgsvc, 'convertir_boceto_imagen', fake_convertir_boceto)
+
+    payload = {
+        "sketchImage": "http://127.0.0.1:8000/images/drawn_images/drawn_abc123.png",
+        "sketchText": "convertir este boceto en arte digital"
+    }
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    assert r.status_code == 200
+    resp = r.json()
+    assert resp['file'] == 'generated_sketch_123.png'
+    assert resp['seed'] == 7777
+    assert recorded['input_img'] == payload['sketchImage']
+    assert recorded['input_text'] == payload['sketchText']
+
+
+def test_generate_sketch_image_missing_text(client):
+    """Test sketch endpoint with missing sketchText field"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    # Missing sketchText
+    payload = {"sketchImage": "http://127.0.0.1:8000/images/drawn_images/drawn_abc.png"}
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    assert r.status_code == 422
+
+
+def test_generate_sketch_image_missing_image(client):
+    """Test sketch endpoint with missing sketchImage field"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    # Missing sketchImage
+    payload = {"sketchText": "convertir boceto"}
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    assert r.status_code == 422
+
+
+def test_generate_sketch_image_empty_text(client, monkeypatch):
+    """Test sketch endpoint with empty sketchText"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    def fake_convertir_boceto(input_img, input_text):
+        if not input_text or input_text.strip() == "":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="El texto no puede estar vacío")
+        return {"message": "ok", "file": "sketch.png", "fullPath": "/tmp/sketch.png", "seed": 1111}
+
+    monkeypatch.setattr(imgsvc, 'convertir_boceto_imagen', fake_convertir_boceto)
+
+    payload = {"sketchImage": "http://127.0.0.1:8000/images/drawn_images/drawn_abc.png", "sketchText": ""}
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    assert r.status_code == 400
+
+
+def test_generate_sketch_image_invalid_image_url(client, monkeypatch):
+    """Test sketch endpoint when image file is not found"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    def fake_convertir_boceto(input_img, input_text):
+        # Simulate image not found
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Imagen de boceto no encontrada")
+
+    monkeypatch.setattr(imgsvc, 'convertir_boceto_imagen', fake_convertir_boceto)
+
+    payload = {
+        "sketchImage": "http://127.0.0.1:8000/images/drawn_images/nonexistent.png",
+        "sketchText": "convertir boceto"
+    }
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    assert r.status_code == 404
+
+
+def test_upload_drawn_image_success(client, monkeypatch):
+    """Test successful upload of a drawn image from Canvas"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    def fake_publicar_dibujo(upload_file):
+        return {
+            "message": "ok",
+            "file": "drawn_canvas_456.png",
+            "fullPath": "/path/to/drawn_canvas_456.png",
+            "seed": None
+        }
+
+    monkeypatch.setattr(imgsvc, 'publicar_dibujo', fake_publicar_dibujo)
+
+    # Simulate multipart file upload
+    from io import BytesIO
+    fake_file_content = b"fake image bytes"
+    files = {'file': ('drawing.png', BytesIO(fake_file_content), 'image/png')}
+    r = client.post(f'/comfy/users/{uid}/images/drawn', files=files)
+    assert r.status_code == 200
+    resp = r.json()
+    assert resp['file'] == 'drawn_canvas_456.png'
+    assert resp.get('seed') is None
+
+
+def test_upload_drawn_image_no_file(client):
+    """Test upload drawn endpoint without providing a file"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    # No file provided
+    r = client.post(f'/comfy/users/{uid}/images/drawn')
+    assert r.status_code == 422
+
+
+def test_upload_drawn_image_invalid_file_type(client, monkeypatch):
+    """Test upload drawn endpoint with invalid file type"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    def fake_publicar_dibujo(upload_file):
+        # Validate file type
+        if not upload_file.content_type.startswith('image/'):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
+        return {"message": "ok", "file": "drawn.png", "fullPath": "/tmp/drawn.png", "seed": None}
+
+    monkeypatch.setattr(imgsvc, 'publicar_dibujo', fake_publicar_dibujo)
+
+    from io import BytesIO
+    fake_file_content = b"not an image"
+    files = {'file': ('drawing.txt', BytesIO(fake_file_content), 'text/plain')}
+    r = client.post(f'/comfy/users/{uid}/images/drawn', files=files)
+    assert r.status_code == 400
+
+
+def test_upload_drawn_image_therapist_forbidden(client, monkeypatch):
+    """Test that therapists cannot upload drawn images"""
+    r = client.get('/users/users/')
+    users = r.json()
+    therapist = next(u for u in users if u['email'] == 'therapist@example.com')
+    tid = therapist['id']
+
+    from io import BytesIO
+    fake_file_content = b"fake image bytes"
+    files = {'file': ('drawing.png', BytesIO(fake_file_content), 'image/png')}
+    r = client.post(f'/comfy/users/{tid}/images/drawn', files=files)
+    # Should be rejected because therapists can't have images
+    assert r.status_code == 404
+
+
+def test_sketch_to_image_service_error(client, monkeypatch):
+    """Test sketch endpoint when service raises a service error"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    def fake_convertir_boceto(input_img, input_text):
+        # Simulate internal service error using HTTPException
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="ComfyUI service unavailable")
+
+    monkeypatch.setattr(imgsvc, 'convertir_boceto_imagen', fake_convertir_boceto)
+
+    payload = {
+        "sketchImage": "http://127.0.0.1:8000/images/drawn_images/drawn_abc.png",
+        "sketchText": "convertir boceto"
+    }
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    # Should return 503 service unavailable
+    assert r.status_code == 503
+
+
+def test_sketch_preserves_seed_in_db(client, monkeypatch):
+    """Test that generated sketch images store seed in database"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    uid = patient['id']
+
+    def fake_convertir_boceto(input_img, input_text):
+        return {
+            "message": "ok",
+            "file": "generated_from_sketch_999.png",
+            "fullPath": "/tmp/generated_from_sketch_999.png",
+            "seed": 8888
+        }
+
+    monkeypatch.setattr(imgsvc, 'convertir_boceto_imagen', fake_convertir_boceto)
+
+    payload = {
+        "sketchImage": "http://127.0.0.1:8000/images/drawn_images/drawn_test.png",
+        "sketchText": "arte abstracto"
+    }
+    r = client.post(f'/comfy/users/{uid}/sketch-images/', json=payload)
+    assert r.status_code == 200
+    resp = r.json()
+    # Verify seed is returned
+    assert resp.get('seed') == 8888
+
+    # Verify image was stored in DB by fetching user images
+    r_images = client.get(f'/comfy/users/{uid}/images')
+    assert r_images.status_code == 200
+    images = r_images.json()
+    # Should contain at least one image with matching filename
+    matching = [img for img in images['data'] if img['fileName'] == 'generated_from_sketch_999.png']
+    assert len(matching) > 0
+    assert matching[0]['seed'] == 8888
