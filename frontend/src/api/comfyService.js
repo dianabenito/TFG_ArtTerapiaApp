@@ -4,7 +4,7 @@ const API_URL = 'http://127.0.0.1:8000' // tu backend FastAPI
 
 export const comfyService = {
 
-  async createImage(prompt, userId = 2) {
+  async createImage(prompt, userId) {
     try {
       // log payload for easier debugging
       console.debug('createImage payload:', prompt)
@@ -19,7 +19,7 @@ export const comfyService = {
     }
   },
 
-  async convertirBoceto(prompt, userId = 2) {
+  async convertirBoceto(prompt, userId) {
     try {
       // log payload for easier debugging
       console.debug('createImage payload:', prompt)
@@ -34,7 +34,7 @@ export const comfyService = {
     }
   },
 
-  async generateImageByMultiple(images, count, userId = 2) {
+  async generateImageByMultiple(images, count, userId) {
     try {
       console.log('generateImageByMultiple called with images:', images, 'and count:', count)
       // backend expects { data: [{ fileName: '...' }, ...], count: N }
@@ -50,7 +50,7 @@ export const comfyService = {
     }
   },
 
-  async uploadImage(file, userId = 2) {
+  async uploadImage(file, userId) {
     const form = new FormData()
     form.append('file', file)
     const response = await axios.post(`${API_URL}/comfy/users/${userId}/images/upload`, form, {
@@ -59,7 +59,7 @@ export const comfyService = {
     return response.data
   },
 
-  async uploadDrawnImage(file, userId = 2) {
+  async uploadDrawnImage(file, userId) {
     const form = new FormData()
     form.append('file', file)
     const response = await axios.post(`${API_URL}/comfy/users/${userId}/images/drawn`, form, {
@@ -68,7 +68,7 @@ export const comfyService = {
     return response.data
   },
 
-  async getImagesForUser(userId = 2) {
+  async getImagesForUser(userId) {
     const response = await axios.get(`${API_URL}/comfy/users/${userId}/images`)
     return response.data
   },
