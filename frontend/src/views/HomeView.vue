@@ -52,6 +52,10 @@ const logout = () => {
       </div>
 
       <div>
+        <button @click="() => router.push('/calendar')">Calendario</button>
+      </div>
+
+      <div>
         <button @click="logout">Cerrar sesión</button>
       </div>
 

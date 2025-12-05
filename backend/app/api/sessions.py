@@ -26,6 +26,13 @@ def create_session_for_patient(patient_id: int,
         raise HTTPException(status_code=404, detail="Patient not found")
     return crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
 
+@router.get('/my-sessions', response_model=schemas.SessionsOut)
+async def get_sessions_active_user(db: SessionDep, current_user: CurrentUser):
+    sessions = db.query(models.Session).filter(
+        (models.Session.patient_id == current_user.id) | (models.Session.therapist_id == current_user.id)
+    ).all()
+    return {"data": sessions, "count": len(sessions)}
+
 
 @router.get('/active', response_model=schemas.Session)
 def get_active_session(db: SessionDep, current_user: CurrentUser):
