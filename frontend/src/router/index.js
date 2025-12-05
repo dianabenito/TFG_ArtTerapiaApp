@@ -5,6 +5,7 @@ import LoginView from '../views/LoginView.vue'
 import HomeView from '../views/HomeView.vue'
 import CanvasView from '../views/CanvasView.vue'
 import GenerationView from '../views/GenerationView.vue'
+import CalendarView from '../views/CalendarView.vue'
 
 const routes = [
   { path: '/', component: UsersView },
@@ -17,6 +18,7 @@ const routes = [
   { path: '/session/:sessionId/patient', component: GenerationView, props: true },
   { path: '/session/:sessionId/patient/canvas', component: CanvasView, props: true },
   { path: '/session/:sessionId/therapist', component: TherapistGenerationView, props: true },
+  { path: '/calendar', component: CalendarView }
 ]
 
 export const router = createRouter({

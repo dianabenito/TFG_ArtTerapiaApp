@@ -681,6 +681,9 @@ const drawSketch = async () => {
     <div>    
       <button @click="submitImage" style="margin-top:1rem">Enviar al terapeuta</button>
     </div>
+    <div>
+        <button @click="() => router.push('/home')">Volver al inicio</button>
+    </div>
   </div>
 </template>
 

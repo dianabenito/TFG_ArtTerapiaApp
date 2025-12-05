@@ -22,3 +22,6 @@ class Session(SessionBase):
     class Config:
         orm_mode = True
     
+class SessionsOut(BaseModel):
+    data: list[Session]
+    count: int
