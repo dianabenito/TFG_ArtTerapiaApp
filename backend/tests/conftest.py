@@ -57,8 +57,8 @@ def initialized_app():
     db = TestingSessionLocal()
     try:
         # create patient and therapist using CRUD directly (bypass password strength issues by valid password)
-        patient_in = schemas.UserCreate(email="patient@example.com", password="Password1!", type=schemas.UserType.patient)
-        therapist_in = schemas.UserCreate(email="therapist@example.com", password="Password1!", type=schemas.UserType.therapist)
+        patient_in = schemas.UserCreate(email="patient@example.com", full_name="Paciente Prueba", password="Password1!", type=schemas.UserType.patient)
+        therapist_in = schemas.UserCreate(email="therapist@example.com", full_name="Terapeuta Prueba", password="Password1!", type=schemas.UserType.therapist)
         patient = crud.user.create_user(db, patient_in)
         therapist = crud.user.create_user(db, therapist_in)
 

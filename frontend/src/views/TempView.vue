@@ -4,7 +4,7 @@ import { userService } from '../api/userService'
 import UserCard from '../components/UserCard.vue'
 
 const users = ref([])
-const newUser = ref({email: '', password: '', type: '' })
+const newUser = ref({email: '', full_name: '', password: '', type: '' })
 
 onMounted(async () => {
   users.value = await userService.getUsers()
@@ -14,7 +14,7 @@ const addUser = async () => {
   try {
     const created = await userService.createUser(newUser.value)
     users.value.push(created) // Añadimos el nuevo usuario a la lista
-    newUser.value = { email: '', password: '', type: '' } // Reseteamos el formulario
+    newUser.value = { email: '', full_name: '', password: '', type: '' } // Reseteamos el formulario
   } catch (err) {
     console.error('Error creando usuario:', err)
   }
@@ -28,6 +28,7 @@ const addUser = async () => {
     <!-- Formulario para crear usuario -->
     <form @submit.prevent="addUser" class="form">
       <input v-model="newUser.email" type="email" placeholder="Email" required />
+      <input v-model="newUser.full_name" type="text" placeholder="Nombre completo" required />
       <input v-model="newUser.password" type="password" placeholder="Contraseña" required />
       <select v-model="newUser.type">
         <option value="patient">Paciente</option>

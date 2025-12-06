@@ -11,6 +11,14 @@ class UserType(str, Enum):
 
 class UserBase(BaseModel):
     email: EmailStr
+    full_name: str
+
+    @field_validator('full_name')
+    @classmethod
+    def full_name_not_empty(cls, v: str):
+        if not v or not v.strip():
+            raise ValueError("full_name must not be empty")
+        return v.strip()
 
 class UserCreate(UserBase):
     password: str
