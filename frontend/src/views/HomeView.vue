@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { userService } from '../api/userService'
+import { sessionsService } from '../api/sessionsService'
 
 const router = useRouter()
 const user = ref(null)
@@ -20,7 +21,7 @@ onMounted(async () => {
 
   // obtener sesión activa (si existe)
   try {
-    activeSession.value = await userService.getActiveSession()
+    activeSession.value = await sessionsService.getActiveSession()
     console.log('Active session:', activeSession.value)
   } catch (e) {
     activeSession.value = null
