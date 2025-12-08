@@ -20,25 +20,55 @@
           <dt>Terapeuta</dt>
           <dd>{{ selectedSession.therapist_id ?? 'N/D' }}</dd>
           <dt>Inicio</dt>
-          <dd>{{ selectedSession.start_date ?? 'N/D' }}</dd>
+          <dd>{{ formatLocalDate(selectedSession.start_date) }}</dd>
           <dt>Fin</dt>
-          <dd>{{ selectedSession.end_date ?? 'N/D' }}</dd>
+          <dd>{{ formatLocalDate(selectedSession.end_date) }}</dd>
           <dt>Finalizada</dt>
-          <dd>{{ selectedSession.ended_at ?? 'N/D' }}</dd>
+          <dd>{{ formatLocalDate(selectedSession.ended_at) }}</dd>
         </dl>
         <div class="actions">
             <button class="btn-primary" v-if="isSessionActive(selectedSession)" @click="isSessionActive(selectedSession) ? router.push(`/session/${selectedSession.id}/${user.type}`) : null">
                 Ir a sesión activa
             </button>
-
+            
             <button
               class="btn-primary"
-              v-if="(user && user.type === 'therapist') && canCancel(selectedSession)"
+              v-if="(user && user.type === 'therapist') && canModify(selectedSession)"
               @click="eliminarSesion(selectedSession.id)">
               Cancelar sesión
             </button>
+            <button 
+              class="btn-primary" 
+              v-if="(user && user.type === 'therapist') && canModify(selectedSession)" 
+              @click="actualizarSesion(selectedSession.id)">
+              Actualizar sesión
+            </button>
           <button @click="closeModal">Cerrar</button>
         </div>
+      </div>
+    </div>
+
+    <div v-if="showUpdateModal" class="modal-overlay" @click.self="closeUpdate">
+      <div class="modal">
+        <h3>Actualizar sesión</h3>
+        <form class="create-form" @submit.prevent="actualizarSesionConfirm(selectedSession.id)">
+          <label>
+            Fecha
+            <input v-model="updateForm.date" type="date" required />
+          </label>
+          <label>
+            Hora inicio
+            <input v-model="updateForm.startTime" type="time" required />
+          </label>
+          <label>
+            Hora fin
+            <input v-model="updateForm.endTime" type="time" required />
+          </label>
+          <div class="actions">
+            <button type="button" @click="closeUpdate">Cancelar</button>
+            <button type="submit" class="btn-primary">Confirmar</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -54,12 +84,16 @@
             </select>
           </label>
           <label>
-            Inicio
-            <input v-model="newSession.start" type="datetime-local" required />
+            Fecha
+            <input v-model="newSession.date" type="date" required />
           </label>
           <label>
-            Fin
-            <input v-model="newSession.end" type="datetime-local" required />
+            Hora inicio
+            <input v-model="newSession.startTime" type="time" required />
+          </label>
+          <label>
+            Hora fin
+            <input v-model="newSession.endTime" type="time" required />
           </label>
           <div class="actions">
             <button type="button" @click="closeCreate">Cancelar</button>
@@ -95,8 +129,10 @@ const activeSession = ref(null)
 const user = ref(null)
 const patients = ref([])
 const showCreateModal = ref(false)
-const newSession = ref({ patientId: '', start: '', end: '' })
+const newSession = ref({ patientId: '', date: '', startTime: '', endTime: '' })
+const updateForm = ref({ date: '', startTime: '', endTime: '' })
 const sessionsList = ref([])
+const showUpdateModal = ref(false)
 
 onMounted(async () => {
   try {
@@ -153,21 +189,34 @@ const eliminarSesion = async (sessionId) => {
   }
 }
 
-const canCancel = (session) => {
-  if (!session) return false
-  if (isSessionActive(session)) return false
-  if (!session.start_date) return false
-  return new Date(session.start_date) > new Date()
+const actualizarSesion = (sessionId) => {
+  const session = sessionsList.value.find(s => s.id === sessionId)
+  if (!session) {
+    alert('Sesión no encontrada')
+    return
+  }
+  selectedSession.value = { ...session }
+  
+  const startDate = new Date(session.start_date)
+  const endDate = new Date(session.end_date)
+  updateForm.value = {
+    date: startDate.toISOString().split('T')[0],
+    startTime: startDate.toTimeString().slice(0, 5),
+    endTime: endDate.toTimeString().slice(0, 5)
+  }
+  
+  showUpdateModal.value = true
+  showModal.value = false
 }
 
-const createSession = async () => {
+const actualizarSesionConfirm = async (sessionId) => {
   try {
-    if (!newSession.value.patientId || !newSession.value.start || !newSession.value.end) {
-      alert('Completa paciente, inicio y fin')
-      return
-    }
-    const newStart = new Date(newSession.value.start)
-    const newEnd = new Date(newSession.value.end)
+
+    const startDateTime = `${updateForm.value.date} ${updateForm.value.startTime}:00`
+    const endDateTime = `${updateForm.value.date} ${updateForm.value.endTime}:00`
+    const newStart = new Date(startDateTime.replace(' ', 'T'))
+    const newEnd = new Date(endDateTime.replace(' ', 'T'))
+    
     const overlap = sessionsList.value.find(s => {
       if (!s.start_date || !s.end_date) return false
       const sStart = new Date(s.start_date)
@@ -181,8 +230,55 @@ const createSession = async () => {
     }
 
     const session_data = {
-      start_date: new Date(newSession.value.start).toISOString(),
-      end_date: new Date(newSession.value.end).toISOString()
+      start_date: startDateTime,
+      end_date: endDateTime
+    }
+    
+    await sessionsService.updateSession(sessionId, session_data)
+    alert('Sesión actualizada correctamente')
+    await loadSessions()
+    closeUpdate()
+    closeModal()
+  } catch (e) {
+    console.error('Error actualizando sesión:', e)
+    alert('No se pudo actualizar la sesión')
+  }
+}
+
+const canModify = (session) => {
+  if (!session) return false
+  if (isSessionActive(session)) return false
+  if (!session.start_date) return false
+  return new Date(session.start_date) > new Date()
+}
+
+const createSession = async () => {
+  try {
+    if (!newSession.value.patientId || !newSession.value.date || !newSession.value.startTime || !newSession.value.endTime) {
+      alert('Completa todos los campos')
+      return
+    }
+    
+    const startDateTime = `${newSession.value.date} ${newSession.value.startTime}:00`
+    const endDateTime = `${newSession.value.date} ${newSession.value.endTime}:00`
+    const newStart = new Date(startDateTime.replace(' ', 'T'))
+    const newEnd = new Date(endDateTime.replace(' ', 'T'))
+    
+    const overlap = sessionsList.value.find(s => {
+      if (!s.start_date || !s.end_date) return false
+      const sStart = new Date(s.start_date)
+      const sEnd = new Date(s.end_date)
+      return newStart < sEnd && newEnd > sStart
+    })
+
+    if (overlap) {
+      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
+      if (!ok) return
+    }
+
+    const session_data = {
+      start_date: startDateTime,
+      end_date: endDateTime
     }
     const created = await sessionsService.createSession(newSession.value.patientId, session_data)
     console.log('Sesión creada:', created)
@@ -215,7 +311,18 @@ const loadSessions = async () => {
 
 const closeCreate = () => {
   showCreateModal.value = false
-  newSession.value = { patientId: '', start: '', end: '' }
+  newSession.value = { patientId: '', date: '', startTime: '', endTime: '' }
+}
+
+const closeUpdate = () => {
+  showUpdateModal.value = false
+  selectedSession.value = null
+}
+
+const formatLocalDate = (utcString) => {
+  if (!utcString) return 'N/D'
+  const date = new Date(utcString)
+  return date.toLocaleString('es-ES', { timeZone: 'Europe/Madrid', dateStyle: 'short', timeStyle: 'short' })
 }
 
 </script>

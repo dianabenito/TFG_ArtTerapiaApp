@@ -4,9 +4,8 @@ from typing import Optional
 
 
 class SessionBase(BaseModel):
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    # Timestamp when the therapist actually ended the session (optional)
+    start_date: datetime
+    end_date: datetime
     ended_at: Optional[datetime] = None
 
 
@@ -25,3 +24,7 @@ class Session(SessionBase):
 class SessionsOut(BaseModel):
     data: list[Session]
     count: int
+
+class SessionUpdate(BaseModel):
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None 

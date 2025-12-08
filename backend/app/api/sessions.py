@@ -26,6 +26,25 @@ def create_session_for_patient(patient_id: int,
         raise HTTPException(status_code=404, detail="Patient not found")
     return crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
 
+@router.put("/session/{session_id}", response_model=schemas.Session)
+def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionDep, current_user: CurrentUser):
+    db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not db_session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    # Only therapist or patient may update the session
+    if current_user.id not in (db_session.patient_id, db_session.therapist_id):
+        raise HTTPException(status_code=403, detail="Not allowed to update this session")
+
+    # Update fields if provided
+    if session.start_date is not None:
+        db_session.start_date = session.start_date
+    if session.end_date is not None:
+        db_session.end_date = session.end_date
+
+    db.commit()
+    db.refresh(db_session)
+    return db_session
+
 @router.get('/my-sessions', response_model=schemas.SessionsOut)
 async def get_sessions_active_user(db: SessionDep, current_user: CurrentUser):
     sessions = db.query(models.Session).filter(

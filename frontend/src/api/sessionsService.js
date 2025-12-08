@@ -56,6 +56,16 @@ export const sessionsService = {
       headers: { Authorization: `Bearer ${token}` }
     })
     return response.data
+  },
+
+  async updateSession(sessionId, sessionData) {
+    const token = localStorage.getItem('token')
+    const response = await axios.put(
+      `${API_URL}/sessions/session/${sessionId}`,
+      sessionData,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    return response.data
   }
 
 }
