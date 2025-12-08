@@ -96,6 +96,7 @@ const user = ref(null)
 const patients = ref([])
 const showCreateModal = ref(false)
 const newSession = ref({ patientId: '', start: '', end: '' })
+const sessionsList = ref([])
 
 onMounted(async () => {
   try {
@@ -165,6 +166,20 @@ const createSession = async () => {
       alert('Completa paciente, inicio y fin')
       return
     }
+    const newStart = new Date(newSession.value.start)
+    const newEnd = new Date(newSession.value.end)
+    const overlap = sessionsList.value.find(s => {
+      if (!s.start_date || !s.end_date) return false
+      const sStart = new Date(s.start_date)
+      const sEnd = new Date(s.end_date)
+      return newStart < sEnd && newEnd > sStart
+    })
+
+    if (overlap) {
+      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
+      if (!ok) return
+    }
+
     const session_data = {
       start_date: new Date(newSession.value.start).toISOString(),
       end_date: new Date(newSession.value.end).toISOString()
@@ -181,8 +196,10 @@ const createSession = async () => {
 
 const loadSessions = async () => {
   const sessions = await sessionsService.getMySessions();
-  // API returns { data: [...], count: n }; normalize to array of sessions
   const list = Array.isArray(sessions?.data) ? sessions.data : (Array.isArray(sessions) ? sessions : []);
+  sessionsList.value = list
+
+  console.log('Sesiones cargadas:', list);
 
   calendarOptions.value = {
     ...calendarOptions.value,
