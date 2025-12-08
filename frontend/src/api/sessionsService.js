@@ -48,6 +48,14 @@ export const sessionsService = {
       { headers: { Authorization: `Bearer ${token}` } }
     )
     return response.data
+  },
+
+  async deleteSession(sessionId) {
+    const token = localStorage.getItem('token')
+    const response = await axios.delete(`${API_URL}/sessions/session/${sessionId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
   }
 
 }

@@ -30,6 +30,13 @@
             <button class="btn-primary" v-if="isSessionActive(selectedSession)" @click="isSessionActive(selectedSession) ? router.push(`/session/${selectedSession.id}/${user.type}`) : null">
                 Ir a sesión activa
             </button>
+
+            <button
+              class="btn-primary"
+              v-if="(user && user.type === 'therapist') && canCancel(selectedSession)"
+              @click="eliminarSesion(selectedSession.id)">
+              Cancelar sesión
+            </button>
           <button @click="closeModal">Cerrar</button>
         </div>
       </div>
@@ -128,6 +135,28 @@ const closeModal = () => {
 const isSessionActive = (session) => {
   if (!session || !activeSession.value) return false
   return session.id === activeSession.value.id
+}
+
+const eliminarSesion = async (sessionId) => {
+  const ok = confirm('¿Estás seguro de que deseas cancelar esta sesión?')
+  if (!ok) return
+
+  try {
+    await sessionsService.deleteSession(sessionId)
+    alert('Sesión cancelada correctamente')
+    await loadSessions()
+    closeModal()
+  } catch (e) {
+    console.error('Error cancelando sesión:', e)
+    alert('No se pudo cancelar la sesión')
+  }
+}
+
+const canCancel = (session) => {
+  if (!session) return false
+  if (isSessionActive(session)) return false
+  if (!session.start_date) return false
+  return new Date(session.start_date) > new Date()
 }
 
 const createSession = async () => {

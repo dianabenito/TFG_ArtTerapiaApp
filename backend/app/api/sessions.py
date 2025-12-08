@@ -113,3 +113,18 @@ async def end_session_by_id(session_id: int, db: SessionDep, current_user: Curre
         pass
 
     return updated
+
+@router.delete('/session/{session_id}')
+async def delete_session_by_id(session_id: int, db: SessionDep, current_user: CurrentUser):
+    """
+    Delete a session by id. Only the therapist of the session may perform this action.
+    """
+    session = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if current_user.type != 'therapist' or current_user.id != session.therapist_id:
+        raise HTTPException(status_code=403, detail="Only the therapist for this session can delete it")
+
+    db.delete(session)
+    db.commit()
+    return {"detail": "Session deleted successfully"}
