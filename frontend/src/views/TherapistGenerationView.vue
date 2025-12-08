@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userService } from '../api/userService.js'
+import { sessionsService } from '../api/sessionsService.js'
 
 const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
@@ -68,7 +69,7 @@ const connectSocket = () => {
 onMounted(async () => {
   if (!Number.isFinite(sessionId)) return
   try {
-    sessionInfo.value = await userService.getSession(sessionId)
+    sessionInfo.value = await sessionsService.getSession(sessionId)
     if (sessionInfo.value?.ended_at) {
       message.value = 'La sesión está finalizada.'
       return
@@ -90,7 +91,7 @@ const confirmEnd = async () => {
   if (!ok) return
 
   try {
-    await userService.endSession(sessionId)
+    await sessionsService.endSession(sessionId)
     // cerrar websocket y redirigir
     socket?.close()
     alert('Sesión finalizada correctamente')

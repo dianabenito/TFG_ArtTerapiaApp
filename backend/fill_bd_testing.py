@@ -15,12 +15,12 @@ def ensure_tables():
     models.Base.metadata.create_all(bind=engine)
 
 
-def get_or_create_user(db, model_cls, email, plain_password):
+def get_or_create_user(db, model_cls, email, plain_password, full_name):
     user = db.query(model_cls).filter(model_cls.email == email).first()
     if user:
         return user
     hashed = hash_password(plain_password)
-    user = model_cls(email=email, hashed_password=hashed)
+    user = model_cls(email=email, full_name=full_name, hashed_password=hashed)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -50,13 +50,13 @@ def main():
     db = SessionLocal()
     try:
         print('Creando usuarios de prueba...')
-        p1 = get_or_create_user(db, models.Patient, 'patient1@example.com', 'P@ssword1')
-        p2 = get_or_create_user(db, models.Patient, 'patient2@example.com', 'P@ssword2')
-        p3 = get_or_create_user(db, models.Patient, 'patient3@example.com', 'P@ssword3')
-        t1 = get_or_create_user(db, models.Therapist, 'therapist1@example.com', 'T@ssword1')
-        t2 = get_or_create_user(db, models.Therapist, 'therapist2@example.com', 'T@ssword2')
-        t3 = get_or_create_user(db, models.Therapist, 'therapist3@example.com', 'T@ssword3')
-        t4 = get_or_create_user(db, models.Therapist, 'therapist4@example.com', 'T@ssword4')
+        p1 = get_or_create_user(db, models.Patient, 'patient1@example.com', 'P@ssword1', 'Paciente Uno')
+        p2 = get_or_create_user(db, models.Patient, 'patient2@example.com', 'P@ssword2', 'Paciente Dos')
+        p3 = get_or_create_user(db, models.Patient, 'patient3@example.com', 'P@ssword3', 'Paciente Tres')
+        t1 = get_or_create_user(db, models.Therapist, 'therapist1@example.com', 'T@ssword1', 'Terapeuta Uno')
+        t2 = get_or_create_user(db, models.Therapist, 'therapist2@example.com', 'T@ssword2', 'Terapeuta Dos')
+        t3 = get_or_create_user(db, models.Therapist, 'therapist3@example.com', 'T@ssword3', 'Terapeuta Tres')
+        t4 = get_or_create_user(db, models.Therapist, 'therapist4@example.com', 'T@ssword4', 'Terapeuta Cuatro')
 
         print(f'Usuarios: p1={p1.id}, p2={p2.id}, t1={t1.id}, t2={t2.id}')
 
