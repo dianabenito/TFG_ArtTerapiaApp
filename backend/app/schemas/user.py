@@ -3,7 +3,6 @@ from enum import Enum
 from pydantic import BaseModel, field_validator, Field, EmailStr
 import re
 from datetime import datetime
-from .item import Item
 
 class UserType(str, Enum):
     patient = "patient"
@@ -33,6 +32,5 @@ class User(UserBase):
     type: UserType
     is_active: bool
     created_at: datetime
-    items: List[Item] = []
     class Config:
         orm_mode = True
