@@ -4,7 +4,7 @@ from app.schemas import UserCreate, UserType
 
 def test_create_and_login_and_me(client):
     # create a new patient
-    payload = {"email": "alice@example.com", "password": "Password1!", "type": "patient"}
+    payload = {"email": "alice@example.com", "full_name": "Alice Example", "password": "Password1!", "type": "patient"}
     r = client.post('/users/users/', json=payload)
     assert r.status_code == 200
     user = r.json()
@@ -45,6 +45,6 @@ def test_login_wrong_password(client):
 
 
 def test_create_duplicate_user(client):
-    payload = {"email": "patient@example.com", "password": "Password1!", "type": "patient"}
+    payload = {"email": "patient@example.com", "full_name": "Paciente Prueba", "password": "Password1!", "type": "patient"}
     r = client.post('/users/users/', json=payload)
     assert r.status_code == 400

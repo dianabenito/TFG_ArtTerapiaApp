@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService.js'
+import { sessionsService } from '../api/sessionsService.js'
 
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from '../stores/toastStore.js'
@@ -102,7 +103,7 @@ onMounted(async () => {
   // obtener info de sesión
   if (Number.isFinite(sessionId)) {
     try {
-      sessionInfo.value = await userService.getSession(sessionId)
+      sessionInfo.value = await sessionsService.getSession(sessionId)
       // si la sesión ya está finalizada, mostrar alerta y redirigir al home
       if (sessionInfo.value?.ended_at) {
         try {

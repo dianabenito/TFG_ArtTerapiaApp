@@ -99,7 +99,7 @@ def test_patient_cannot_create_or_end_session_and_nonparticipant_forbidden(clien
     assert r4.status_code == 403
 
     # create another user (other) and ensure they cannot GET the session
-    r5 = client.post('/users/users/', json={"email": "other@example.com", "password": "Password1!", "type": "patient"})
+    r5 = client.post('/users/users/', json={"email": "other@example.com", "full_name": "Other User", "password": "Password1!", "type": "patient"})
     assert r5.status_code == 200
     rlogin = client.post('/users/login/', data={'username': 'other@example.com', 'password': 'Password1!'})
     assert rlogin.status_code == 200

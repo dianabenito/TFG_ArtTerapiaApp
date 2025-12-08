@@ -26,9 +26,9 @@ def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = hash_password(user.password)
 
     if user.type == schemas.UserType.patient:
-        db_user = models.Patient(email=user.email, hashed_password=hashed_password)
+        db_user = models.Patient(email=user.email, full_name=user.full_name, hashed_password=hashed_password)
     else:
-        db_user = models.Therapist(email=user.email, hashed_password=hashed_password)
+        db_user = models.Therapist(email=user.email, full_name=user.full_name, hashed_password=hashed_password)
 
     db.add(db_user)
     db.commit()

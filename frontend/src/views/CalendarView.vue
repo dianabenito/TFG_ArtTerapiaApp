@@ -1,5 +1,10 @@
 <template>
   <div class="calendar-container">
+    <div class="toolbar">
+      <button @click="() => router.push('/home')">Volver al inicio</button>
+      <button v-if="user && user.type === 'therapist'" class="btn-primary" @click="showCreateModal = true">Crear nueva sesión</button>
+    </div>
+
     <FullCalendar :options="calendarOptions" 
         @eventClick="handleEventClick"
     />
@@ -25,13 +30,43 @@
             <button class="btn-primary" v-if="isSessionActive(selectedSession)" @click="isSessionActive(selectedSession) ? router.push(`/session/${selectedSession.id}/${user.type}`) : null">
                 Ir a sesión activa
             </button>
+
+            <button
+              class="btn-primary"
+              v-if="(user && user.type === 'therapist') && canCancel(selectedSession)"
+              @click="eliminarSesion(selectedSession.id)">
+              Cancelar sesión
+            </button>
           <button @click="closeModal">Cerrar</button>
         </div>
       </div>
     </div>
 
-    <div>
-        <button @click="() => router.push('/home')">Volver al inicio</button>
+    <div v-if="showCreateModal" class="modal-overlay" @click.self="closeCreate">
+      <div class="modal">
+        <h3>Nueva sesión</h3>
+        <form class="create-form" @submit.prevent="createSession">
+          <label>
+            Paciente
+            <select v-model="newSession.patientId" required>
+              <option value="" disabled>Selecciona paciente</option>
+              <option v-for="p in patients" :key="p.id" :value="p.id">{{ p.full_name }} ({{ p.email }})</option>
+            </select>
+          </label>
+          <label>
+            Inicio
+            <input v-model="newSession.start" type="datetime-local" required />
+          </label>
+          <label>
+            Fin
+            <input v-model="newSession.end" type="datetime-local" required />
+          </label>
+          <div class="actions">
+            <button type="button" @click="closeCreate">Cancelar</button>
+            <button type="submit" class="btn-primary">Confirmar</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>
@@ -41,6 +76,7 @@ import { ref, onMounted } from "vue";
 import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { userService } from '../api/userService';
+import { sessionsService } from '../api/sessionsService';
 import { useRouter } from "vue-router";
 
 const calendarOptions = ref({
@@ -57,6 +93,10 @@ const router = useRouter()
 const loading = ref(true)
 const activeSession = ref(null)
 const user = ref(null)
+const patients = ref([])
+const showCreateModal = ref(false)
+const newSession = ref({ patientId: '', start: '', end: '' })
+const sessionsList = ref([])
 
 onMounted(async () => {
   try {
@@ -65,22 +105,16 @@ onMounted(async () => {
     user.value = null
   }
 
-  const sessions = await userService.getMySessions();
-  // API returns { data: [...], count: n }; normalize to array of sessions
-  const list = Array.isArray(sessions?.data) ? sessions.data : (Array.isArray(sessions) ? sessions : []);
-
-  calendarOptions.value = {
-    ...calendarOptions.value,
-    events: list.map(s => ({
-      title: "Sesión",
-      start: s.start_date,
-      end: s.end_date,
-      extendedProps: { session: s },
-    })),
-    eventClick: handleEventClick,
-  };
   try {
-    activeSession.value = await userService.getActiveSession()
+    const allUsers = await userService.getUsers()
+    patients.value = Array.isArray(allUsers) ? allUsers.filter(u => u.type === 'patient') : []
+  } catch (e) {
+    patients.value = []
+  }
+
+  await loadSessions()
+  try {
+    activeSession.value = await sessionsService.getActiveSession()
     console.log('Active session:', activeSession.value)
   } catch (e) {
     activeSession.value = null
@@ -104,9 +138,133 @@ const isSessionActive = (session) => {
   return session.id === activeSession.value.id
 }
 
+const eliminarSesion = async (sessionId) => {
+  const ok = confirm('¿Estás seguro de que deseas cancelar esta sesión?')
+  if (!ok) return
+
+  try {
+    await sessionsService.deleteSession(sessionId)
+    alert('Sesión cancelada correctamente')
+    await loadSessions()
+    closeModal()
+  } catch (e) {
+    console.error('Error cancelando sesión:', e)
+    alert('No se pudo cancelar la sesión')
+  }
+}
+
+const canCancel = (session) => {
+  if (!session) return false
+  if (isSessionActive(session)) return false
+  if (!session.start_date) return false
+  return new Date(session.start_date) > new Date()
+}
+
+const createSession = async () => {
+  try {
+    if (!newSession.value.patientId || !newSession.value.start || !newSession.value.end) {
+      alert('Completa paciente, inicio y fin')
+      return
+    }
+    const newStart = new Date(newSession.value.start)
+    const newEnd = new Date(newSession.value.end)
+    const overlap = sessionsList.value.find(s => {
+      if (!s.start_date || !s.end_date) return false
+      const sStart = new Date(s.start_date)
+      const sEnd = new Date(s.end_date)
+      return newStart < sEnd && newEnd > sStart
+    })
+
+    if (overlap) {
+      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
+      if (!ok) return
+    }
+
+    const session_data = {
+      start_date: new Date(newSession.value.start).toISOString(),
+      end_date: new Date(newSession.value.end).toISOString()
+    }
+    const created = await sessionsService.createSession(newSession.value.patientId, session_data)
+    console.log('Sesión creada:', created)
+    await loadSessions()
+    closeCreate()
+  } catch (e) {
+    console.error('Error creando sesión:', e)
+    alert('No se pudo crear la sesión')
+  }
+}
+
+const loadSessions = async () => {
+  const sessions = await sessionsService.getMySessions();
+  const list = Array.isArray(sessions?.data) ? sessions.data : (Array.isArray(sessions) ? sessions : []);
+  sessionsList.value = list
+
+  console.log('Sesiones cargadas:', list);
+
+  calendarOptions.value = {
+    ...calendarOptions.value,
+    events: list.map(s => ({
+      title: "Sesión",
+      start: s.start_date,
+      end: s.end_date,
+      extendedProps: { session: s },
+    })),
+    eventClick: handleEventClick,
+  };
+}
+
+const closeCreate = () => {
+  showCreateModal.value = false
+  newSession.value = { patientId: '', start: '', end: '' }
+}
+
 </script>
 
 <style>
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.create-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.create-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  color: #111;
+  gap: 0.25rem;
+}
+
+.create-form input,
+.create-form select {
+  padding: 0.45rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.link {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+}
+
+.muted {
+  color: #6b7280;
+  margin: 0;
+  grid-column: 1 / -1;
+}
+
 .calendar-container {
   max-width: 900px;
   margin: auto;
