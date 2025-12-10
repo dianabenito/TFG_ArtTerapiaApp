@@ -215,37 +215,23 @@ const actualizarSesion = (sessionId) => {
 
 const actualizarSesionConfirm = async (sessionId) => {
   try {
-
-    const startDateTime = localToUTC(updateForm.value.date, updateForm.value.startTime)
-    const endDateTime = localToUTC(updateForm.value.date, updateForm.value.endTime)
-    const newStart = new Date(startDateTime)
-    const newEnd = new Date(endDateTime)
+    const session_data = await saveSessionWithOverlapCheck(
+      updateForm.value.date,
+      updateForm.value.startTime,
+      updateForm.value.endTime,
+      { excludeSessionId: sessionId }
+    );
     
-    const overlap = sessionsList.value.find(s => {
-      if (!s.start_date || !s.end_date) return false
-      const sStart = new Date(s.start_date)
-      const sEnd = new Date(s.end_date)
-      return newStart < sEnd && newEnd > sStart
-    })
+    if (!session_data) return;
 
-    if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
-    }
-
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    
-    await sessionsService.updateSession(sessionId, session_data)
-    alert('Sesión actualizada correctamente')
-    await loadSessions()
-    closeUpdate()
-    closeModal()
+    await sessionsService.updateSession(sessionId, session_data);
+    alert('Sesión actualizada correctamente');
+    await loadSessions();
+    closeUpdate();
+    closeModal();
   } catch (e) {
-    console.error('Error actualizando sesión:', e)
-    alert('No se pudo actualizar la sesión')
+    console.error('Error actualizando sesión:', e);
+    alert('No se pudo actualizar la sesión');
   }
 }
 
@@ -256,41 +242,76 @@ const canModify = (session) => {
   return new Date(ensureUTCString(session.start_date)) > new Date();
 }
 
-const createSession = async () => {
-  try {
-    if (!newSession.value.patientId || !newSession.value.date || !newSession.value.startTime || !newSession.value.endTime) {
-      alert('Completa todos los campos')
-      return
-    }
+// Verifica si hay solapamiento de horarios con otras sesiones
+const checkSessionOverlap = (startDateTime, endDateTime, excludeSessionId = null) => {
+  const newStart = new Date(startDateTime);
+  const newEnd = new Date(endDateTime);
+  
+  return sessionsList.value.find(s => {
+    if (!s.start_date || !s.end_date) return false;
+    if (excludeSessionId && s.id === excludeSessionId) return false; // Excluir sesión en edición
+    const sStart = new Date(ensureUTCString(s.start_date));
+    const sEnd = new Date(ensureUTCString(s.end_date));
+    return newStart < sEnd && newEnd > sStart;
+  });
+}
 
-    const startDateTime = localToUTC(newSession.value.date, newSession.value.startTime);
-    const endDateTime = localToUTC(newSession.value.date, newSession.value.endTime);
-    const newStart = new Date(startDateTime);
-    const newEnd = new Date(endDateTime);
-    
-    const overlap = sessionsList.value.find(s => {
-      if (!s.start_date || !s.end_date) return false
-      const sStart = new Date(s.start_date)
-      const sEnd = new Date(s.end_date)
-      return newStart < sEnd && newEnd > sStart
-    })
-
-    if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
-    }
-
-    const session_data = {
+// Convierte datos de formulario a objeto de sesión para backend
+const buildSessionData = (date, startTime, endTime) => {
+  const startDateTime = localToUTC(date, startTime);
+  const endDateTime = localToUTC(date, endTime);
+  
+  return {
+    startDateTime,
+    endDateTime,
+    sessionData: {
       start_date: startDateTime,
       end_date: endDateTime
     }
-    const created = await sessionsService.createSession(newSession.value.patientId, session_data)
-    console.log('Sesión creada:', created)
-    await loadSessions()
-    closeCreate()
+  };
+}
+
+// Maneja la lógica común de guardar sesión (crear o actualizar)
+const saveSessionWithOverlapCheck = async (date, startTime, endTime, options = {}) => {
+  const { excludeSessionId = null } = options;
+  
+  if (!date || !startTime || !endTime) {
+    alert('Completa todos los campos requeridos');
+    return null;
+  }
+  
+  const { startDateTime, endDateTime, sessionData } = buildSessionData(date, startTime, endTime);
+  const overlap = checkSessionOverlap(startDateTime, endDateTime, excludeSessionId);
+  
+  if (overlap) {
+    const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?');
+    if (!ok) return null;
+  }
+  
+  return sessionData;
+}
+
+const createSession = async () => {
+  try {
+    if (!newSession.value.patientId) {
+      alert('Selecciona un paciente')
+      return
+    }
+
+    const session_data = await saveSessionWithOverlapCheck(
+      newSession.value.date,
+      newSession.value.startTime,
+      newSession.value.endTime
+    );
+    
+    if (!session_data) return;
+
+    await sessionsService.createSession(newSession.value.patientId, session_data);
+    await loadSessions();
+    closeCreate();
   } catch (e) {
-    console.error('Error creando sesión:', e)
-    alert('No se pudo crear la sesión')
+    console.error('Error creando sesión:', e);
+    alert('No se pudo crear la sesión');
   }
 }
 
@@ -375,8 +396,6 @@ const utcToLocalInput = (utcString) => {
 
   return { date: dateStr, time: timeStr };
 };
-
-
 
 </script>
 
