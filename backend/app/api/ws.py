@@ -3,87 +3,93 @@ from typing import Dict
 from app.security import decode_access_token
 from app.database import SessionLocal
 import app.models as models
+import json
 
 router = APIRouter()
 
-# Diccionario que mantiene las conexiones activas por sesión
+# Diccionario que mantiene conexiones activas por sesión
 active_sessions: Dict[int, Dict[str, WebSocket]] = {}
 
 
 @router.websocket("/ws/{session_id}/{role}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
     """
-    WebSocket para comunicación paciente-terapeuta.
-    Autentica al usuario mediante token JWT pasado por query param `?token=...`.
-    Sólo permite la conexión si el token identifica al paciente/terapeuta de la sesión.
+    WebSocket seguro y bidireccional para paciente y terapeuta.
+    Permite:
+      - envío de imágenes
+      - notificaciones de estado
+      - finalización de sesión
+      - **chat en tiempo real**
     """
-    # Obtener token desde query params (más fiable para websockets en este setup)
+
+    # 1. Obtener token del query param
     token = websocket.query_params.get("token")
     if not token:
         await websocket.close(code=1008)
         return
 
-    # Decodificar token y obtener user id
+    # 2. Decodificar JWT
     try:
-        user_id = decode_access_token(token)
-        user_id = int(user_id)
+        user_id = int(decode_access_token(token))
     except Exception:
         await websocket.close(code=1008)
         return
 
-    # Cargar sesión y usuario desde DB y verificar permisos
+    # 3. Verificar sesión y rol en la base de datos
     db = SessionLocal()
     try:
         user = db.query(models.User).filter(models.User.id == user_id).first()
-        if not user:
-            await websocket.close(code=1008)
-            return
-
         session = db.query(models.Session).filter(models.Session.id == session_id).first()
-        if not session:
+
+        if not user or not session:
             await websocket.close(code=1008)
             return
 
-        # If the session has been finalized by the therapist, reject new connections
-        if getattr(session, 'ended_at', None) is not None:
-            # Session already ended
+        if getattr(session, "ended_at", None) is not None:
             await websocket.close(code=1008)
             return
 
-        # Verificar que el usuario coincide con el role y pertenece a la sesión
-        if role == "patient":
-            if user.id != session.patient_id:
-                await websocket.close(code=1008)
-                return
-        elif role == "therapist":
-            if user.id != session.therapist_id:
-                await websocket.close(code=1008)
-                return
-        else:
-            await websocket.close(code=1003)
+        # Verificar rol
+        if role == "patient" and user.id != session.patient_id:
+            await websocket.close(code=1008)
             return
+        if role == "therapist" and user.id != session.therapist_id:
+            await websocket.close(code=1008)
+            return
+
     finally:
         db.close()
 
-    # Si todo OK, aceptar la conexión
+    # 4. Aceptar conexión
     await websocket.accept()
 
+    # Registrar socket
     if session_id not in active_sessions:
         active_sessions[session_id] = {}
-
     active_sessions[session_id][role] = websocket
+
     print(f"{role} conectado en sesión {session_id} (user {user_id})")
+
+    # Informar
 
     try:
         while True:
             data = await websocket.receive_text()
             other_role = "therapist" if role == "patient" else "patient"
+            
+            try:
+                obj = json.loads(data)
+            except json.JSONDecodeError:
+                # Texto plano → convertir a mensaje de chat
+                obj = {"event": "chat_message", "sender": role, "text": data}
+
+            # Si el otro está conectado, enviar mensaje
             if other_role in active_sessions.get(session_id, {}):
                 try:
-                    await active_sessions[session_id][other_role].send_text(data)
+                    await active_sessions[session_id][other_role].send_text(json.dumps(obj))
                 except Exception:
-                    # si no se puede enviar, eliminar la conexión y continuar
                     del active_sessions[session_id][other_role]
+                    
     except WebSocketDisconnect:
         print(f"{role} desconectado de la sesión {session_id}")
         if session_id in active_sessions and role in active_sessions[session_id]:
