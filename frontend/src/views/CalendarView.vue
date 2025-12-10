@@ -116,10 +116,12 @@ import { useRouter } from "vue-router";
 const calendarOptions = ref({
   plugins: [dayGridPlugin],
   initialView: 'dayGridMonth',
+  timeZone: 'Europe/Madrid',
   events: [],
   eventColor: '#3b82f6',
   height: 'auto',
 });
+
 
 const showModal = ref(false)
 const selectedSession = ref(null)
@@ -197,96 +199,119 @@ const actualizarSesion = (sessionId) => {
   }
   selectedSession.value = { ...session }
   
-  const startDate = new Date(session.start_date)
-  const endDate = new Date(session.end_date)
+  const start = utcToLocalInput(session.start_date);
+  const end = utcToLocalInput(session.end_date);
+
   updateForm.value = {
-    date: startDate.toISOString().split('T')[0],
-    startTime: startDate.toTimeString().slice(0, 5),
-    endTime: endDate.toTimeString().slice(0, 5)
+    date: start.date,
+    startTime: start.time,
+    endTime: end.time
   }
-  
+
+
   showUpdateModal.value = true
   showModal.value = false
 }
 
 const actualizarSesionConfirm = async (sessionId) => {
   try {
-
-    const startDateTime = `${updateForm.value.date} ${updateForm.value.startTime}:00`
-    const endDateTime = `${updateForm.value.date} ${updateForm.value.endTime}:00`
-    const newStart = new Date(startDateTime.replace(' ', 'T'))
-    const newEnd = new Date(endDateTime.replace(' ', 'T'))
+    const session_data = await saveSessionWithOverlapCheck(
+      updateForm.value.date,
+      updateForm.value.startTime,
+      updateForm.value.endTime,
+      { excludeSessionId: sessionId }
+    );
     
-    const overlap = sessionsList.value.find(s => {
-      if (!s.start_date || !s.end_date) return false
-      const sStart = new Date(s.start_date)
-      const sEnd = new Date(s.end_date)
-      return newStart < sEnd && newEnd > sStart
-    })
+    if (!session_data) return;
 
-    if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
-    }
-
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    
-    await sessionsService.updateSession(sessionId, session_data)
-    alert('Sesión actualizada correctamente')
-    await loadSessions()
-    closeUpdate()
-    closeModal()
+    await sessionsService.updateSession(sessionId, session_data);
+    alert('Sesión actualizada correctamente');
+    await loadSessions();
+    closeUpdate();
+    closeModal();
   } catch (e) {
-    console.error('Error actualizando sesión:', e)
-    alert('No se pudo actualizar la sesión')
+    console.error('Error actualizando sesión:', e);
+    alert('No se pudo actualizar la sesión');
   }
 }
 
 const canModify = (session) => {
-  if (!session) return false
-  if (isSessionActive(session)) return false
-  if (!session.start_date) return false
-  return new Date(session.start_date) > new Date()
+  if (!session) return false;
+  if (isSessionActive(session)) return false;
+  if (!session.start_date) return false;
+  return new Date(ensureUTCString(session.start_date)) > new Date();
+}
+
+// Verifica si hay solapamiento de horarios con otras sesiones
+const checkSessionOverlap = (startDateTime, endDateTime, excludeSessionId = null) => {
+  const newStart = new Date(startDateTime);
+  const newEnd = new Date(endDateTime);
+  
+  return sessionsList.value.find(s => {
+    if (!s.start_date || !s.end_date) return false;
+    if (excludeSessionId && s.id === excludeSessionId) return false; // Excluir sesión en edición
+    const sStart = new Date(ensureUTCString(s.start_date));
+    const sEnd = new Date(ensureUTCString(s.end_date));
+    return newStart < sEnd && newEnd > sStart;
+  });
+}
+
+// Convierte datos de formulario a objeto de sesión para backend
+const buildSessionData = (date, startTime, endTime) => {
+  const startDateTime = localToUTC(date, startTime);
+  const endDateTime = localToUTC(date, endTime);
+  
+  return {
+    startDateTime,
+    endDateTime,
+    sessionData: {
+      start_date: startDateTime,
+      end_date: endDateTime
+    }
+  };
+}
+
+// Maneja la lógica común de guardar sesión (crear o actualizar)
+const saveSessionWithOverlapCheck = async (date, startTime, endTime, options = {}) => {
+  const { excludeSessionId = null } = options;
+  
+  if (!date || !startTime || !endTime) {
+    alert('Completa todos los campos requeridos');
+    return null;
+  }
+  
+  const { startDateTime, endDateTime, sessionData } = buildSessionData(date, startTime, endTime);
+  const overlap = checkSessionOverlap(startDateTime, endDateTime, excludeSessionId);
+  
+  if (overlap) {
+    const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?');
+    if (!ok) return null;
+  }
+  
+  return sessionData;
 }
 
 const createSession = async () => {
   try {
-    if (!newSession.value.patientId || !newSession.value.date || !newSession.value.startTime || !newSession.value.endTime) {
-      alert('Completa todos los campos')
+    if (!newSession.value.patientId) {
+      alert('Selecciona un paciente')
       return
     }
-    
-    const startDateTime = `${newSession.value.date} ${newSession.value.startTime}:00`
-    const endDateTime = `${newSession.value.date} ${newSession.value.endTime}:00`
-    const newStart = new Date(startDateTime.replace(' ', 'T'))
-    const newEnd = new Date(endDateTime.replace(' ', 'T'))
-    
-    const overlap = sessionsList.value.find(s => {
-      if (!s.start_date || !s.end_date) return false
-      const sStart = new Date(s.start_date)
-      const sEnd = new Date(s.end_date)
-      return newStart < sEnd && newEnd > sStart
-    })
 
-    if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
-    }
+    const session_data = await saveSessionWithOverlapCheck(
+      newSession.value.date,
+      newSession.value.startTime,
+      newSession.value.endTime
+    );
+    
+    if (!session_data) return;
 
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    const created = await sessionsService.createSession(newSession.value.patientId, session_data)
-    console.log('Sesión creada:', created)
-    await loadSessions()
-    closeCreate()
+    await sessionsService.createSession(newSession.value.patientId, session_data);
+    await loadSessions();
+    closeCreate();
   } catch (e) {
-    console.error('Error creando sesión:', e)
-    alert('No se pudo crear la sesión')
+    console.error('Error creando sesión:', e);
+    alert('No se pudo crear la sesión');
   }
 }
 
@@ -301,8 +326,9 @@ const loadSessions = async () => {
     ...calendarOptions.value,
     events: list.map(s => ({
       title: "Sesión",
-      start: s.start_date,
-      end: s.end_date,
+      start: dateToLocalString(new Date(ensureUTCString(s.start_date))),
+      end: dateToLocalString(new Date(ensureUTCString(s.end_date))),
+      displayEventTime: true,
       extendedProps: { session: s },
     })),
     eventClick: handleEventClick,
@@ -319,11 +345,57 @@ const closeUpdate = () => {
   selectedSession.value = null
 }
 
-const formatLocalDate = (utcString) => {
-  if (!utcString) return 'N/D'
-  const date = new Date(utcString)
-  return date.toLocaleString('es-ES', { timeZone: 'Europe/Madrid', dateStyle: 'short', timeStyle: 'short' })
+// Helper: Asegura que un string UTC tenga 'Z' al final para interpretación correcta
+const ensureUTCString = (dateString) => {
+  if (!dateString) return dateString;
+  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+    return dateString + 'Z';
+  }
+  return dateString;
 }
+
+const formatLocalDate = (utcString) => {
+  if (!utcString) return 'N/D';
+  return new Date(ensureUTCString(utcString)).toLocaleString('es-ES', {
+    timeZone: 'Europe/Madrid',
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
+}
+
+const localToUTC = (dateStr, timeStr) => {
+  const date = new Date(`${dateStr}T${timeStr}:00`);
+  return date.toISOString();
+}
+
+// Convierte un UTC Date a string "YYYY-MM-DDTHH:mm:ss" (hora local, sin Z)
+// para que FullCalendar lo muestre sin desfase
+const dateToLocalString = (utcDate) => {
+  const year = utcDate.getFullYear();
+  const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+  const day = String(utcDate.getDate()).padStart(2, '0');
+  const hours = String(utcDate.getHours()).padStart(2, '0');
+  const minutes = String(utcDate.getMinutes()).padStart(2, '0');
+  const seconds = String(utcDate.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+const utcToLocalInput = (utcString) => {
+  const date = new Date(ensureUTCString(utcString));
+
+  const dateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Madrid'
+  }).format(date);
+
+  const timeStr = new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'Europe/Madrid',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+
+  return { date: dateStr, time: timeStr };
+};
 
 </script>
 
