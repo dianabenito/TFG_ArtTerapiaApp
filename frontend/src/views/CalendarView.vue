@@ -116,10 +116,12 @@ import { useRouter } from "vue-router";
 const calendarOptions = ref({
   plugins: [dayGridPlugin],
   initialView: 'dayGridMonth',
+  timeZone: 'Europe/Madrid',
   events: [],
   eventColor: '#3b82f6',
   height: 'auto',
 });
+
 
 const showModal = ref(false)
 const selectedSession = ref(null)
@@ -197,14 +199,16 @@ const actualizarSesion = (sessionId) => {
   }
   selectedSession.value = { ...session }
   
-  const startDate = new Date(session.start_date)
-  const endDate = new Date(session.end_date)
+  const start = utcToLocalInput(session.start_date);
+  const end = utcToLocalInput(session.end_date);
+
   updateForm.value = {
-    date: startDate.toISOString().split('T')[0],
-    startTime: startDate.toTimeString().slice(0, 5),
-    endTime: endDate.toTimeString().slice(0, 5)
+    date: start.date,
+    startTime: start.time,
+    endTime: end.time
   }
-  
+
+
   showUpdateModal.value = true
   showModal.value = false
 }
@@ -212,10 +216,10 @@ const actualizarSesion = (sessionId) => {
 const actualizarSesionConfirm = async (sessionId) => {
   try {
 
-    const startDateTime = `${updateForm.value.date} ${updateForm.value.startTime}:00`
-    const endDateTime = `${updateForm.value.date} ${updateForm.value.endTime}:00`
-    const newStart = new Date(startDateTime.replace(' ', 'T'))
-    const newEnd = new Date(endDateTime.replace(' ', 'T'))
+    const startDateTime = localToUTC(updateForm.value.date, updateForm.value.startTime)
+    const endDateTime = localToUTC(updateForm.value.date, updateForm.value.endTime)
+    const newStart = new Date(startDateTime)
+    const newEnd = new Date(endDateTime)
     
     const overlap = sessionsList.value.find(s => {
       if (!s.start_date || !s.end_date) return false
@@ -246,10 +250,10 @@ const actualizarSesionConfirm = async (sessionId) => {
 }
 
 const canModify = (session) => {
-  if (!session) return false
-  if (isSessionActive(session)) return false
-  if (!session.start_date) return false
-  return new Date(session.start_date) > new Date()
+  if (!session) return false;
+  if (isSessionActive(session)) return false;
+  if (!session.start_date) return false;
+  return new Date(ensureUTCString(session.start_date)) > new Date();
 }
 
 const createSession = async () => {
@@ -258,11 +262,11 @@ const createSession = async () => {
       alert('Completa todos los campos')
       return
     }
-    
-    const startDateTime = `${newSession.value.date} ${newSession.value.startTime}:00`
-    const endDateTime = `${newSession.value.date} ${newSession.value.endTime}:00`
-    const newStart = new Date(startDateTime.replace(' ', 'T'))
-    const newEnd = new Date(endDateTime.replace(' ', 'T'))
+
+    const startDateTime = localToUTC(newSession.value.date, newSession.value.startTime);
+    const endDateTime = localToUTC(newSession.value.date, newSession.value.endTime);
+    const newStart = new Date(startDateTime);
+    const newEnd = new Date(endDateTime);
     
     const overlap = sessionsList.value.find(s => {
       if (!s.start_date || !s.end_date) return false
@@ -301,8 +305,9 @@ const loadSessions = async () => {
     ...calendarOptions.value,
     events: list.map(s => ({
       title: "Sesión",
-      start: s.start_date,
-      end: s.end_date,
+      start: dateToLocalString(new Date(ensureUTCString(s.start_date))),
+      end: dateToLocalString(new Date(ensureUTCString(s.end_date))),
+      displayEventTime: true,
       extendedProps: { session: s },
     })),
     eventClick: handleEventClick,
@@ -319,11 +324,59 @@ const closeUpdate = () => {
   selectedSession.value = null
 }
 
-const formatLocalDate = (utcString) => {
-  if (!utcString) return 'N/D'
-  const date = new Date(utcString)
-  return date.toLocaleString('es-ES', { timeZone: 'Europe/Madrid', dateStyle: 'short', timeStyle: 'short' })
+// Helper: Asegura que un string UTC tenga 'Z' al final para interpretación correcta
+const ensureUTCString = (dateString) => {
+  if (!dateString) return dateString;
+  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+    return dateString + 'Z';
+  }
+  return dateString;
 }
+
+const formatLocalDate = (utcString) => {
+  if (!utcString) return 'N/D';
+  return new Date(ensureUTCString(utcString)).toLocaleString('es-ES', {
+    timeZone: 'Europe/Madrid',
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
+}
+
+const localToUTC = (dateStr, timeStr) => {
+  const date = new Date(`${dateStr}T${timeStr}:00`);
+  return date.toISOString();
+}
+
+// Convierte un UTC Date a string "YYYY-MM-DDTHH:mm:ss" (hora local, sin Z)
+// para que FullCalendar lo muestre sin desfase
+const dateToLocalString = (utcDate) => {
+  const year = utcDate.getFullYear();
+  const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+  const day = String(utcDate.getDate()).padStart(2, '0');
+  const hours = String(utcDate.getHours()).padStart(2, '0');
+  const minutes = String(utcDate.getMinutes()).padStart(2, '0');
+  const seconds = String(utcDate.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+const utcToLocalInput = (utcString) => {
+  const date = new Date(ensureUTCString(utcString));
+
+  const dateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Madrid'
+  }).format(date);
+
+  const timeStr = new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'Europe/Madrid',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+
+  return { date: dateStr, time: timeStr };
+};
+
+
 
 </script>
 
