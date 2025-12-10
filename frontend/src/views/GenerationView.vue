@@ -10,6 +10,9 @@ const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
 const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
+
+const chatMessages = ref([])       
+const newChatMessage = ref('')     
 const role = 'patient'
 
 const prompt = ref({ promptText: '', seed: null, inputImage: null })
@@ -76,7 +79,10 @@ const connectWs = () => {
   ws.onmessage = (ev) => {
     try {
       const obj = JSON.parse(ev.data)
-      console.log('WS message (obj):', obj)
+      if (obj.event === 'chat_message') {
+        chatMessages.value.push({ sender: obj.sender, text: obj.text })
+        return
+      }
     } catch (e) {
       // manejar mensaje plain text
       const txt = String(ev.data)
@@ -139,6 +145,14 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => ws?.close())
+
+const sendChatMessage = () => {
+  if (!newChatMessage.value || !ws || ws.readyState !== WebSocket.OPEN) return
+  const msg = { event: 'chat_message', sender: role, text: newChatMessage.value }
+  ws.send(JSON.stringify(msg))
+  chatMessages.value.push(msg)  // reflejar mensaje localmente
+  newChatMessage.value = ''
+}
 
 const generateImage = async (last_seed = null, inputImage = null) => {
   try {
@@ -555,6 +569,7 @@ const drawSketch = async () => {
     <!-- Refine Modal -->
     <div v-if="showRefineModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
       <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
+        <button class="close-btn" @click="showRefineModal = false">Cerrar</button>
         <div>
           <label>Prompt:</label>
           <input v-model="prompt.promptText" type="text" style="width:100%;" />
@@ -576,7 +591,7 @@ const drawSketch = async () => {
     <!-- Images Modal -->
     <div v-if="showImagesModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
       <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
-        <!-- Upload from gallery -->
+        <button class="close-btn" @click="showImagesModal = false">Cerrar</button>
         <div style="margin-top:1rem;">
             <label for="fileInput">Subir imagen desde galería:</label>
             <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
@@ -609,7 +624,7 @@ const drawSketch = async () => {
     <!-- Drawing Modal -->
     <div v-if="showDrawModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
       <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
-        <!-- Upload from gallery -->
+        <button class="close-btn" @click="showDrawModal = false">Cerrar</button>
         <div style="margin-top:1rem;">
             <div>
               <label>Prompt:</label>
@@ -679,6 +694,16 @@ const drawSketch = async () => {
         </div>
       </div>
     </div>
+    <div class="chat-container" style="margin-top:1rem;">
+      <div class="chat-messages" style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:0.5rem; margin-bottom:0.5rem;">
+        <div v-for="(msg, i) in chatMessages" :key="i" :style="{ textAlign: msg.sender === role ? 'right' : 'left' }">
+          <strong>{{ msg.sender }}:</strong> {{ msg.text }}
+        </div>
+      </div>
+      <input v-model="newChatMessage" @keyup.enter="sendChatMessage" placeholder="Escribe un mensaje..." style="width:70%" />
+      <button @click="sendChatMessage" style="width:25%">Enviar</button>
+    </div>
+
     <div>    
       <button @click="submitImage" style="margin-top:1rem">Enviar al terapeuta</button>
     </div>
