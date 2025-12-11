@@ -20,7 +20,7 @@ import Toast from './components/Toast.vue'
 import Header from './components/Header.vue'
 
 const route = useRoute()
-const authPaths = ['/login', '/login/', '/signup', '/signup/']
+const authPaths = ['/login', '/']
 const showHeader = computed(() => !authPaths.includes(route.path))
 
 document.title = 'App ArtTerapia'
