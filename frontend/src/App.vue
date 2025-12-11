@@ -20,8 +20,14 @@ import Toast from './components/Toast.vue'
 import Header from './components/Header.vue'
 
 const route = useRoute()
-const authPaths = ['/login', '/']
+const authPaths = ['/', '/signup']
 const showHeader = computed(() => !authPaths.includes(route.path))
 
 document.title = 'App ArtTerapia'
 </script>
+
+<style>
+html, body {
+  overscroll-behavior: none;
+}
+</style>

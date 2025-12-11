@@ -8,9 +8,9 @@ import GenerationView from '../views/GenerationView.vue'
 import CalendarView from '../views/CalendarView.vue'
 
 const routes = [
-  { path: '/', component: SignupView },
+  { path: '/', component: LoginView },
   { path: '/therapist/', component: TherapistGenerationView },
-  { path: '/login/', component: LoginView },
+  { path: '/signup/', component: SignupView },
   { path: '/home/', component: HomeView },
   { path: '/canvas/', component: CanvasView },
   { path: '/generation/', component: GenerationView },

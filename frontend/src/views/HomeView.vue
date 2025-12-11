@@ -32,7 +32,7 @@ onMounted(async () => {
 
 const logout = () => {
   userService.logout()
-  router.push('/login')
+  router.push('/')
 }
 </script>
 
