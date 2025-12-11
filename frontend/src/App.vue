@@ -1,18 +1,27 @@
 <template>
   <div class="min-h-screen bg-gray-50 text-gray-900 font-sans" id="app">
     <Toast />
-    <router-view/>
+
+    <Header v-if="showHeader">
+      <router-view />
+    </Header>
+
+    <div v-else class="min-h-screen">
+      <router-view />
+    </div>
   </div>
 </template>
 
-<script>
+<script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
 import Toast from './components/Toast.vue'
+import Header from './components/Header.vue'
 
-export default {
-  components: { Toast },
-  mounted () {
-    document.title = 'App ArtTerapia'
-  }
-}
+const route = useRoute()
+const authPaths = ['/login', '/login/', '/signup', '/signup/']
+const showHeader = computed(() => !authPaths.includes(route.path))
 
+document.title = 'App ArtTerapia'
 </script>
