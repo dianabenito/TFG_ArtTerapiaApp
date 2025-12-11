@@ -279,3 +279,104 @@ def test_delete_session_success_by_therapist(client):
     r = client.get(f"/sessions/session/{session_id}", 
                    headers={'Authorization': f'Bearer {ttoken}'})
     assert r.status_code == 404
+
+def test_websocket_chat_json_message_format(client):
+    """Test that chat messages in JSON format are properly relayed"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    therapist = next(u for u in users if u['email'] == 'therapist@example.com')
+    
+    ttoken = get_token_for_email(client, therapist['email'])
+    ptoken = get_token_for_email(client, patient['email'])
+    
+    # Create active session
+    now = datetime.utcnow().isoformat()
+    r = client.post(f"/sessions/session/{patient['id']}", 
+                    json={"start_date": now, "end_date": now}, 
+                    headers={'Authorization': f'Bearer {ttoken}'})
+    assert r.status_code == 200
+    sid = r.json()['id']
+    
+    import json as jsonlib
+    
+    with client.websocket_connect(f"/ws/{sid}/therapist?token={ttoken}") as ws_t:
+        with client.websocket_connect(f"/ws/{sid}/patient?token={ptoken}") as ws_p:
+            # Patient sends structured JSON message
+            msg = {"event": "chat_message", "sender": "patient", "text": "Hello therapist!"}
+            ws_p.send_text(jsonlib.dumps(msg))
+            
+            # Therapist receives it
+            received = ws_t.receive_text()
+            data = jsonlib.loads(received)
+            assert data['event'] == 'chat_message'
+            assert data['sender'] == 'patient'
+            assert data['text'] == 'Hello therapist!'
+            
+            # Therapist responds
+            response = {"event": "chat_message", "sender": "therapist", "text": "Hi patient!"}
+            ws_t.send_text(jsonlib.dumps(response))
+            
+            # Patient receives it
+            received2 = ws_p.receive_text()
+            data2 = jsonlib.loads(received2)
+            assert data2['event'] == 'chat_message'
+            assert data2['sender'] == 'therapist'
+            assert data2['text'] == 'Hi patient!'
+
+
+def test_websocket_plain_text_converted_to_chat_message(client):
+    """Test that plain text messages are automatically converted to chat_message format"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    therapist = next(u for u in users if u['email'] == 'therapist@example.com')
+    
+    ttoken = get_token_for_email(client, therapist['email'])
+    ptoken = get_token_for_email(client, patient['email'])
+    
+    # Create active session
+    now = datetime.utcnow().isoformat()
+    r = client.post(f"/sessions/session/{patient['id']}", 
+                    json={"start_date": now, "end_date": now}, 
+                    headers={'Authorization': f'Bearer {ttoken}'})
+    assert r.status_code == 200
+    sid = r.json()['id']
+    
+    import json as jsonlib
+    
+    with client.websocket_connect(f"/ws/{sid}/therapist?token={ttoken}") as ws_t:
+        with client.websocket_connect(f"/ws/{sid}/patient?token={ptoken}") as ws_p:
+            # Patient sends plain text
+            ws_p.send_text('plain text message')
+            
+            # Therapist receives it as structured message
+            received = ws_t.receive_text()
+            data = jsonlib.loads(received)
+            assert data['event'] == 'chat_message'
+            assert data['sender'] == 'patient'
+            assert data['text'] == 'plain text message'
+
+def test_websocket_message_when_other_not_connected(client):
+    """Test sending message when other participant is not connected"""
+    r = client.get('/users/users/')
+    users = r.json()
+    patient = next(u for u in users if u['email'] == 'patient@example.com')
+    therapist = next(u for u in users if u['email'] == 'therapist@example.com')
+    
+    ttoken = get_token_for_email(client, therapist['email'])
+    ptoken = get_token_for_email(client, patient['email'])
+    
+    # Create session
+    now = datetime.utcnow().isoformat()
+    r = client.post(f"/sessions/session/{patient['id']}", 
+                    json={"start_date": now, "end_date": now}, 
+                    headers={'Authorization': f'Bearer {ttoken}'})
+    assert r.status_code == 200
+    sid = r.json()['id']
+    
+    # Only patient connects
+    with client.websocket_connect(f"/ws/{sid}/patient?token={ptoken}") as ws_p:
+        # Patient sends message (therapist not connected)
+        ws_p.send_text('message to void')
+        # Should not raise exception, just silently not delivered
