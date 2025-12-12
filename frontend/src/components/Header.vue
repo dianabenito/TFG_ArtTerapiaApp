@@ -37,8 +37,8 @@ const items = [
 </script>
 
 <template>
-  <div class="flex min-h-screen w-full bg-gray-100 text-gray-800">
-    <SidebarProvider>
+  <div class="min-h-screen flex flex-col bg-gradient-to-b from-gray-300 via-gray-200 to-gray-100 text-gray-800">
+    <SidebarProvider class="flex flex-1">
       <Sidebar>
         <SidebarContent>
           <SidebarGroup>
@@ -110,7 +110,7 @@ const items = [
         </header>
 
         <!-- CONTENT (SE INYECTA DESDE EL PADRE VIA SLOT) -->
-        <main class="mx-auto max-w-7xl flex-1 px-4 py-6">
+        <main class="flex-1 mx-auto max-w-7xl px-4 py-6">
           <slot />
         </main>
 

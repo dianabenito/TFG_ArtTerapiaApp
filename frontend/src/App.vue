@@ -1,16 +1,17 @@
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900 font-sans" id="app">
+  <div id="app" class="font-sans text-gray-900">
     <Toast />
 
     <Header v-if="showHeader">
       <router-view />
     </Header>
 
-    <div v-else class="min-h-screen">
+    <div v-else>
       <router-view />
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { computed } from 'vue'

@@ -37,7 +37,7 @@ const errors = ref<Record<string, string>>({})
 const bgStyle = computed(() => ({
   backgroundImage: `url(${loginBg})`,
   backgroundSize: 'cover',
-  backgroundPosition: 'center',
+  backgroundPosition: 'top center',
 }))
 
 const router = useRouter()

@@ -84,6 +84,37 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
     raise HTTPException(status_code=404, detail="No active session")
 
 
+@router.get('/next', response_model=schemas.Session)
+def get_next_session(db: SessionDep, current_user: CurrentUser):
+    """
+    Devuelve la sesión inmediata para el usuario logueado (paciente o terapeuta).
+    - Si hay una sesión activa (start <= now <= end y no finalizada), se devuelve esa.
+    - Si no hay activa, se devuelve la próxima agendada futura para este usuario.
+    - Si no existe ninguna, se responde 404 con mensaje claro.
+    """
+    now = datetime.utcnow()
+
+    base_query = db.query(models.Session).filter(
+        ((models.Session.patient_id == current_user.id) | (models.Session.therapist_id == current_user.id)),
+        models.Session.ended_at == None,
+    )
+
+    # Primero, la activa
+    active = base_query.filter(
+        models.Session.start_date <= now,
+        models.Session.end_date >= now,
+    ).first()
+    if active:
+        return active
+
+    # Luego, la próxima futura ordenada por fecha de inicio
+    upcoming = base_query.filter(models.Session.start_date > now).order_by(models.Session.start_date.asc()).first()
+    if upcoming:
+        return upcoming
+
+    raise HTTPException(status_code=404, detail="No tienes ninguna sesión programada")
+
+
 @router.get('/session/{session_id}', response_model=schemas.Session)
 def get_session_by_id(session_id: int, db: SessionDep, current_user: CurrentUser):
     """

@@ -45,7 +45,7 @@ const passwordRequirements = ref({
 const bgStyle = computed(() => ({
   backgroundImage: `url(${signupBg})`,
   backgroundSize: 'cover',
-  backgroundPosition: 'center',
+  backgroundPosition: 'top center',
 }))
 
 const validateEmail = (emailStr: string): boolean => {

@@ -11,6 +11,14 @@ export const sessionsService = {
     return response.data
   },
 
+  async getNextSession() {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/sessions/next`, { 
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
   async endSession(sessionId) {
     const token = localStorage.getItem('token')
     const response = await axios.post(`${API_URL}/sessions/end/${sessionId}`, null, {
