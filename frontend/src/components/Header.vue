@@ -1,22 +1,69 @@
-<script setup>
-import { Sidebar, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+<script setup lang="ts">
+import { Calendar, Home } from 'lucide-vue-next'
+import {
+  Sidebar,
+  SidebarProvider,
+  SidebarTrigger,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from '@/components/ui/sidebar'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
 import ProfileDropdown from './ProfileDropdown.vue'
+
+import { useRoute } from 'vue-router'
+const route = useRoute()
+
+const items = [
+  {
+    title: 'Inicio',
+    url: '/home',
+    icon: Home,
+  },
+  {
+    title: 'Calendario',
+    url: '/calendar',
+    icon: Calendar,
+  },
+]
 </script>
 
 <template>
   <div class="flex min-h-screen w-full bg-gray-100 text-gray-800">
     <SidebarProvider>
-
-      <!-- SIDEBAR -->
       <Sidebar>
-        <div
-          class="m-6 h-full rounded-md border border-gray-300 bg-[repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb_1px,#f9fafb_2px,#f9fafb_15px)]"
-        />
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>ArtTeràpia App</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem v-for="item in items" :key="item.title">
+                  <SidebarMenuButton
+                    as-child
+                    :class="{
+                      'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === item.url,
+                      'hover:bg-gray-300': route.path !== item.url
+                    }"
+                  >
+                    <a :href="item.url">
+                      <component :is="item.icon" />
+                      <span>{{ item.title }}</span>
+                    </a>
+                  </SidebarMenuButton>
+
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
       </Sidebar>
 
       <!-- MAIN -->
@@ -29,7 +76,8 @@ import ProfileDropdown from './ProfileDropdown.vue'
             <div class="flex items-center gap-4">
               <SidebarTrigger class="text-gray-700" />
               <Separator orientation="vertical" class="!h-4 hidden sm:block" />
-
+ 
+              <!---
               <Breadcrumb class="hidden sm:block">
                 <BreadcrumbList>
                   <BreadcrumbItem>
@@ -45,6 +93,7 @@ import ProfileDropdown from './ProfileDropdown.vue'
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
+            -->
             </div>
 
             <!-- PROFILE DROPDOWN -->

@@ -46,7 +46,7 @@ def authenticate_user(db: Session, email: str, password: str):
 def login_user(db: Session, email: str, password: str):
     user = authenticate_user(db, email, password)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="El correo o la contraseña son incorrectos")
 
     access_token = create_access_token({"sub": str(user.id),  "user_type": user.type})
     return {"access_token": access_token, "token_type": "bearer"}

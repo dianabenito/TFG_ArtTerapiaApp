@@ -31,7 +31,7 @@ async def read_user(db: SessionDep, user_id: int):
 async def create_user(db: SessionDep, user: schemas.UserCreate):
     db_user = crud.user.get_user_by_email(db, email=user.email)
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
     return crud.user.create_user(db=db, user=user)
 
 @router.post("/login/")

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue"
+import { ref, onMounted } from "vue"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -21,6 +21,28 @@ import {
   CirclePlusIcon,
   LogOutIcon,
 } from "lucide-vue-next"
+
+const user = ref(null)
+const errorMsg = ref('')
+
+import { useRouter } from 'vue-router'
+import { userService } from '../api/userService'
+
+const router = useRouter()
+
+onMounted(async () => {
+  try {
+    user.value = await userService.getCurrentUser()
+    console.log('Usuario actual:', user.value)
+  } catch (error) {
+    errorMsg.value = error.response?.data?.detail || 'No autenticado'
+  }
+})
+
+const logout = () => {
+  userService.logout()
+  router.push('/')
+}
 </script>
 
 <template>
@@ -39,8 +61,8 @@ import {
           <span class="absolute right-0 bottom-0 block size-2 rounded-full bg-green-600 ring-2 ring-white"></span>
         </div>
         <div class="flex flex-col items-start">
-          <span class="text-lg font-semibold">John Doe</span>
-          <span class="text-gray-500 text-base">john.doe@example.com</span>
+          <span class="text-lg font-semibold">{{ user.full_name }}</span>
+          <span class="text-gray-500 text-base">{{ user.email }}</span>
         </div>
       </DropdownMenuLabel>
 
@@ -80,8 +102,8 @@ import {
 
       <DropdownMenuSeparator />
 
-      <DropdownMenuItem class="px-4 py-2.5 text-base text-red-600">
-        <LogOutIcon class="size-5" />
+      <DropdownMenuItem class="px-4 py-2.5 text-base text-red-600" @click="logout()">
+        <LogOutIcon class="size-5"/>
         <span>Logout</span>
       </DropdownMenuItem>
     </DropdownMenuContent>

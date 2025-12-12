@@ -29,11 +29,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-const logout = () => {
-  userService.logout()
-  router.push('/')
-}
 </script>
 
 <template>
@@ -41,25 +36,6 @@ const logout = () => {
     <div v-if="loading">Cargando usuario...</div>
 
     <div v-else>
-      <div v-if="user">
-        <p><strong>Email:</strong> {{ user.email }}</p>
-        <p><strong>Tipo de usuario:</strong> {{ user.type }}</p>
-      </div>
-
-      <div v-else class="muted">
-        <p>No has iniciado sesión.</p>
-        <p>{{ errorMsg }}</p>
-        <router-link to="/login">Ir a iniciar sesión</router-link>
-      </div>
-
-      <div>
-        <button @click="() => router.push('/calendar')">Calendario</button>
-      </div>
-
-      <div>
-        <button @click="logout">Cerrar sesión</button>
-      </div>
-
       <div v-if="activeSession" style="margin-top:1rem">
         <p class="muted">Tienes una sesión activa (ID: {{ activeSession.id }})</p>
         <button v-if="user && user.type === 'patient' && !activeSession.ended_at" @click="() => router.push(`/session/${activeSession.id}/patient`)">Ir a mi sesión (Paciente)</button>

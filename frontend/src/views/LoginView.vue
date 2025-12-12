@@ -15,6 +15,13 @@ import { useRouter } from 'vue-router'
 import { Eye, EyeOff } from 'lucide-vue-next'
 import { userService } from '../api/userService'
 
+import { AlertCircleIcon} from 'lucide-vue-next'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
+
 // Importar logo desde assets
 import logoImg from '@/assets/utils/logo.png'
 import loginBg from '@/assets/utils/fondo_login.jpg'
@@ -157,12 +164,14 @@ const login = async () => {
           <!-- General message -->
           <div
             v-if="message"
-            :class="[
-              'text-sm mt-4 p-3 rounded',
-              messageType === 'error' ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-green-100 text-green-800 border border-green-300'
-            ]"
           >
-            {{ message }}
+            <Alert class="bg-red-100 text-red-800 border border-red-300">
+              <AlertCircleIcon />
+              <AlertTitle>Error al iniciar sesión</AlertTitle>
+              <AlertDescription class="text-red-800">
+                {{ message }}
+              </AlertDescription>
+            </Alert>
           </div>
         </form>
       </CardContent>

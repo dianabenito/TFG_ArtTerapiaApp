@@ -7,8 +7,24 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import signupBg from '@/assets/utils/fondo_login.jpg'
 import logoImg from '@/assets/utils/logo.png'
+import { AlertCircleIcon} from 'lucide-vue-next'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
+
 
 const router = useRouter()
 const newUser = ref({ email: '', full_name: '', password: '', type: '' })
@@ -247,16 +263,26 @@ const addUser = async () => {
             <!-- User Type field -->
             <div class="flex flex-col space-y-1.5">
               <Label for="type">Tipo de usuario</Label>
-              <select
-                id="type"
-                v-model="newUser.type"
-                :class="['border rounded p-2 text-sm', errors.type ? 'border-red-500' : 'border-gray-300']"
-                @change="() => { if (errors.type) delete errors.type }"
-              >
-                <option value="">Selecciona un tipo de usuario</option>
-                <option value="patient">Paciente</option>
-                <option value="therapist">Terapeuta</option>
-              </select>
+
+                <Select id="type"
+                  v-model="newUser.type"
+                  :class="['border rounded p-2 text-sm', errors.type ? 'border-red-500' : 'border-gray-300']"
+                  @change="() => { if (errors.type) delete errors.type }">
+                  <SelectTrigger class="w-full">
+                    <SelectValue placeholder="Selecciona un tipo de usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Tipos de usuario</SelectLabel>
+                      <SelectItem value="patient">
+                        Paciente
+                      </SelectItem>
+                      <SelectItem value="therapist">
+                        Terapeuta
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               <span v-if="errors.type" class="text-xs text-red-600 mt-0.5">
                 {{ errors.type }}
               </span>
@@ -265,12 +291,14 @@ const addUser = async () => {
             <!-- General message -->
             <div
               v-if="message"
-              :class="[
-                'text-sm mt-4 p-3 rounded',
-                messageType === 'error' ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-green-100 text-green-800 border border-green-300'
-              ]"
             >
-              {{ message }}
+              <Alert class="bg-red-100 text-red-800 border border-red-300">
+                <AlertCircleIcon />
+                <AlertTitle>Error al crear la cuenta</AlertTitle>
+                <AlertDescription class="text-red-800">
+                  {{ message }}
+                </AlertDescription>
+              </Alert>
             </div>
           </form>
         </CardContent>
