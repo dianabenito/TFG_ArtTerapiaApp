@@ -8,6 +8,11 @@ export const userService = {
     return response.data
   },
 
+  async getUserById(userId) {
+    const response = await axios.get(`${API_URL}/users/users/${userId}`)
+    return response.data
+  },
+
   async createUser(userData) {
     const response = await axios.post(`${API_URL}/users/users/`, userData)
     return response.data

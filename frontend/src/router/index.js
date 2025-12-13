@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import UsersView from '../views/TempView.vue'
+import SignupView from '../views/SignupView.vue'
 import TherapistGenerationView from '../views/TherapistGenerationView.vue'
 import LoginView from '../views/LoginView.vue'
 import HomeView from '../views/HomeView.vue'
@@ -8,9 +8,9 @@ import GenerationView from '../views/GenerationView.vue'
 import CalendarView from '../views/CalendarView.vue'
 
 const routes = [
-  { path: '/', component: UsersView },
+  { path: '/', component: LoginView },
   { path: '/therapist/', component: TherapistGenerationView },
-  { path: '/login/', component: LoginView },
+  { path: '/signup/', component: SignupView },
   { path: '/home/', component: HomeView },
   { path: '/canvas/', component: CanvasView },
   { path: '/generation/', component: GenerationView },
