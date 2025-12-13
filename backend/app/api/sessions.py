@@ -47,6 +47,7 @@ def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionD
 
 @router.get('/my-sessions', response_model=schemas.SessionsOut)
 async def get_sessions_active_user(db: SessionDep, current_user: CurrentUser):
+    crud.session.finalize_expired_sessions(db, current_user.id)
     sessions = db.query(models.Session).filter(
         (models.Session.patient_id == current_user.id) | (models.Session.therapist_id == current_user.id)
     ).all()
@@ -60,6 +61,7 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
     Searches both patient and therapist roles.
     """
     now = datetime.utcnow()
+    crud.session.finalize_expired_sessions(db, current_user.id)
     # First try as patient
     session = db.query(models.Session).filter(
         models.Session.patient_id == current_user.id,
@@ -93,6 +95,7 @@ def get_next_session(db: SessionDep, current_user: CurrentUser):
     - Si no existe ninguna, se responde 404 con mensaje claro.
     """
     now = datetime.utcnow()
+    crud.session.finalize_expired_sessions(db, current_user.id)
 
     base_query = db.query(models.Session).filter(
         ((models.Session.patient_id == current_user.id) | (models.Session.therapist_id == current_user.id)),
@@ -121,6 +124,7 @@ def get_session_by_id(session_id: int, db: SessionDep, current_user: CurrentUser
     Return a session by id. Allows participants (patient or therapist) to view session info.
     This returns the session even if it has been finalized (ended_at set).
     """
+    crud.session.finalize_expired_sessions(db, current_user.id)
     session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

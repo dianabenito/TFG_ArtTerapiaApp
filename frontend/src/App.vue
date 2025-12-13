@@ -31,4 +31,43 @@ document.title = 'App ArtTerapia'
 html, body {
   overscroll-behavior: none;
 }
+/*
+html, body {
+  margin: 0;
+  min-height: 100%;
+  overscroll-behavior: none;
+}
+
+
+body {
+  background: linear-gradient(
+    to bottom,
+    #d1d5db,
+    #e5e7eb,
+    #f3f4f6
+  );
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+
+  background: linear-gradient(
+    to bottom,
+    #d1d5db,
+    #e5e7eb,
+    #f3f4f6
+  );
+}
+
+#app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+*/
 </style>
+
