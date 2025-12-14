@@ -1,111 +1,302 @@
 <template>
-  <div class="calendar-container">
-    <div class="toolbar">
-      <button @click="() => router.push('/home')">Volver al inicio</button>
-      <button v-if="user && user.type === 'therapist'" class="btn-primary" @click="showCreateModal = true">Crear nueva sesión</button>
+  <div class="max-w-6xl mx-auto p-4 h-[calc(100vh-4rem)] space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="space-y-1">
+        <h1 class="text-2xl font-semibold text-slate-900">Calendario</h1>
+        <p v-if="user?.type === 'therapist'" class="text-sm text-slate-600">Consulta tu agenda y gestiona tus sesiones.</p>
+        <p v-if="user?.type === 'patient'" class="text-sm text-slate-600">Consulta las sesiones programadas en tu agenda.</p>
+      </div>
     </div>
 
-    <FullCalendar :options="calendarOptions" 
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <FullCalendar
+        :options="calendarOptions"
         @eventClick="handleEventClick"
-    />
+        class="fc-shadcn"
+      />
+    </div>
 
-    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal">
-        <h3>Detalles de la sesión</h3>
-        <dl v-if="selectedSession">
-          <dt>ID</dt>
-          <dd>{{ selectedSession.id ?? 'N/D' }}</dd>
-          <dt>Paciente</dt>
-          <dd>{{ selectedSession.patient_id ?? 'N/D' }}</dd>
-          <dt>Terapeuta</dt>
-          <dd>{{ selectedSession.therapist_id ?? 'N/D' }}</dd>
-          <dt>Inicio</dt>
-          <dd>{{ formatLocalDate(selectedSession.start_date) }}</dd>
-          <dt>Fin</dt>
-          <dd>{{ formatLocalDate(selectedSession.end_date) }}</dd>
-          <dt>Finalizada</dt>
-          <dd>{{ formatLocalDate(selectedSession.ended_at) }}</dd>
-        </dl>
-        <div class="actions">
-            <button class="btn-primary" v-if="isSessionActive(selectedSession)" @click="isSessionActive(selectedSession) ? router.push(`/session/${selectedSession.id}/${user.type}`) : null">
-                Ir a sesión activa
-            </button>
-            
-            <button
-              class="btn-primary"
-              v-if="(user && user.type === 'therapist') && canModify(selectedSession)"
-              @click="eliminarSesion(selectedSession.id)">
+    <Dialog :open="showModal"  @update:open="(val) => !val && closeModal()" >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Detalles de la sesión</DialogTitle>
+          <DialogDescription>
+            Consulta la información detallada de la sesión seleccionada.
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="selectedSession">
+          <dl class="grid grid-cols-2 gap-x-1.5 gap-y-1 text-m">
+            <template v-if="user?.type === 'therapist'">
+              <dt class="font-semibold">Paciente</dt>
+              <dd>{{ patient?.full_name ?? 'Cargando...' }}</dd>
+            </template>
+            <template v-else>
+              <dt class="font-semibold">Terapeuta</dt>
+              <dd>{{ therapist?.full_name ?? 'Cargando...' }}</dd>
+            </template>
+
+            <dt class="font-semibold">Fecha</dt>
+            <dd>{{ formatLocalDate(selectedSession.start_date).slice(0,8) }}</dd>
+
+            <dt class="font-semibold">Hora</dt>
+            <dd>{{ formatLocalDate(selectedSession.start_date).slice(10,16) }} - {{ formatLocalDate(selectedSession.end_date).slice(10,16) }}</dd>
+          </dl>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <Button v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
+              Ir a sesión activa
+            </Button>
+            <Button v-if="user?.type==='therapist' && canModify(selectedSession)" variant="destructive" @click="eliminarSesion(selectedSession.id)">
               Cancelar sesión
-            </button>
-            <button 
-              class="btn-primary" 
-              v-if="(user && user.type === 'therapist') && canModify(selectedSession)" 
-              @click="actualizarSesion(selectedSession.id)">
+            </Button>
+            <Button v-if="user?.type==='therapist' && canModify(selectedSession)" variant="default" @click="actualizarSesion(selectedSession.id)">
               Actualizar sesión
-            </button>
-          <button @click="closeModal">Cerrar</button>
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
 
-    <div v-if="showUpdateModal" class="modal-overlay" @click.self="closeUpdate">
-      <div class="modal">
-        <h3>Actualizar sesión</h3>
-        <form class="create-form" @submit.prevent="actualizarSesionConfirm(selectedSession.id)">
-          <label>
-            Fecha
-            <input v-model="updateForm.date" type="date" required />
-          </label>
-          <label>
-            Hora inicio
-            <input v-model="updateForm.startTime" type="time" required />
-          </label>
-          <label>
-            Hora fin
-            <input v-model="updateForm.endTime" type="time" required />
-          </label>
-          <div class="actions">
-            <button type="button" @click="closeUpdate">Cancelar</button>
-            <button type="submit" class="btn-primary">Confirmar</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Dialog :open="showCreateModal" @update:open="(val) => !val && closeCreate()">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Crear una nueva sesión</DialogTitle>
+          <DialogDescription>
+            Rellena los detalles para programar una nueva sesión.
+          </DialogDescription>
+        </DialogHeader>
 
-    <div v-if="showCreateModal" class="modal-overlay" @click.self="closeCreate">
-      <div class="modal">
-        <h3>Nueva sesión</h3>
         <form class="create-form" @submit.prevent="createSession">
-          <label>
-            Paciente
-            <select v-model="newSession.patientId" required>
-              <option value="" disabled>Selecciona paciente</option>
-              <option v-for="p in patients" :key="p.id" :value="p.id">{{ p.full_name }} ({{ p.email }})</option>
-            </select>
-          </label>
-          <label>
-            Fecha
-            <input v-model="newSession.date" type="date" required />
-          </label>
-          <label>
-            Hora inicio
-            <input v-model="newSession.startTime" type="time" required />
-          </label>
-          <label>
-            Hora fin
-            <input v-model="newSession.endTime" type="time" required />
-          </label>
-          <div class="actions">
-            <button type="button" @click="closeCreate">Cancelar</button>
-            <button type="submit" class="btn-primary">Confirmar</button>
+          <div class="grid gap-4">
+            <!-- Paciente -->
+            <div class="grid gap-2">
+              <Label for="patient">Paciente</Label>
+              <Popover v-model:open="openCB">
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    :aria-expanded="openCB"
+                    class="w-full justify-between text-left font-normal"
+                  >
+                    {{
+                      newSession.patientId
+                        ? patients.find(patient => patient.id === newSession.patientId)?.full_name
+                        : 'Selecciona paciente...'
+                    }}
+                    <ChevronsUpDownIcon class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent class="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar paciente..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontró el paciente.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          v-for="patient in patients"
+                          :key="patient.id"
+                          :value="patient.id"
+                          @select="() => {
+                            newSession.patientId = newSession.patientId === patient.id ? '' : patient.id
+                            openCB = false
+                          }"
+                        >
+                          <CheckIcon
+                            :class="cn(
+                              'h-4 w-4',
+                              newSession.patientId === patient.id ? 'opacity-100' : 'opacity-0',
+                            )"
+                          />
+                          {{ patient.full_name }}
+                        </CommandItem>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <!-- Fecha -->
+            <div class="grid gap-2">
+              <Label for="date">Fecha</Label>
+              <Popover v-slot="{ close }">
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="outline"
+                    class="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon class="h-4 w-4" />
+                    {{ newSession.date ? df.format(newSession.date.toDate(getLocalTimeZone())) : "Selecciona fecha" }}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent class="w-full p-0" align="start">
+                  <Calendar
+                    v-model="newSession.date"
+                    :default-placeholder="defaultPlaceholder"
+                    :min-value="today(getLocalTimeZone())"
+                    layout="month-and-year"
+                    initial-focus
+                    @update:model-value="close"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <!-- Hora inicio -->
+            <div class="grid gap-2">
+              <Label for="horaInicio">Hora de inicio</Label>
+              <Input
+                type="time"
+                v-model="newSession.startTime"
+                class="w-full"
+              />
+            </div>
+
+            <!-- Hora fin -->
+            <div class="grid gap-2">
+              <Label for="horaFin">Hora de fin</Label>
+              <Input
+                type="time"
+                v-model="newSession.endTime"
+                class="w-full"
+              />
+            </div>
+
+            <Alert v-if="newSessionError" class="bg-red-100 text-red-800 border border-red-300">
+              <AlertCircleIcon class="h-4 w-4" />
+              <AlertTitle>Error al crear la sesión</AlertTitle>
+              <AlertDescription class="text-red-800">
+                {{ newSessionError }}
+              </AlertDescription>
+            </Alert>
+
+            <!-- Botón de confirmación -->
+            <div class="flex justify-end mt-4">
+              <Button type="submit" variant="default">Confirmar</Button>
+            </div>
+
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="showUpdateModal" @update:open="(val) => !val && closeUpdate()">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Actualizar la fecha de la sesión</DialogTitle>
+          <DialogDescription>
+            Rellena los detalles para modificar la fecha y hora de la sesión programada.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form class="create-form" @submit.prevent="actualizarSesionConfirm(selectedSession.id)">
+          <div class="grid gap-4">
+
+            <!-- Fecha -->
+            <div class="grid gap-2">
+              <Label for="date">Fecha</Label>
+              <Popover v-slot="{ close }">
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="outline"
+                    class="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon class="h-4 w-4" />
+                    {{ updateForm.date ? df.format(updateForm.date.toDate(getLocalTimeZone())) : "Selecciona fecha" }}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent class="w-full p-0" align="start">
+                  <Calendar
+                    v-model="updateForm.date"
+                    :default-placeholder="defaultPlaceholder"
+                    :min-value="today(getLocalTimeZone())"
+                    layout="month-and-year"
+                    initial-focus
+                    @update:model-value="close"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <!-- Hora inicio -->
+            <div class="grid gap-2">
+              <Label for="horaInicio">Hora de inicio</Label>
+              <Input
+                type="time"
+                v-model="updateForm.startTime"
+                class="w-full"
+              />
+            </div>
+
+            <!-- Hora fin -->
+            <div class="grid gap-2">
+              <Label for="horaFin">Hora de fin</Label>
+              <Input
+                type="time"
+                v-model="updateForm.endTime"
+                class="w-full"
+              />
+            </div>
+
+            <Alert v-if="updSessionError" class="bg-red-100 text-red-800 border border-red-300">
+              <AlertCircleIcon class="h-4 w-4" />
+              <AlertTitle>Error al actualizar la sesión</AlertTitle>
+              <AlertDescription class="text-red-800">
+                {{ updSessionError }}
+              </AlertDescription>
+            </Alert>
+
+            <!-- Botón de confirmación -->
+            <div class="flex justify-end mt-4">
+              <Button type="submit" variant="default">Confirmar</Button>
+            </div>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog :open="showOverlapDialog" @update:open="showOverlapDialog = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión solapada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión que intentas actualizar coincide con otra ya agendada.
+            ¿Deseas continuar igualmente?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="cancelOverlap">Cancelar</AlertDialogCancel>
+          <AlertDialogAction @click="confirmOverlap">
+            Continuar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="showCancelDialog" @update:open="showCancelDialog = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancelar sesión</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción cancelará la sesión seleccionada. ¿Deseas continuar?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="cancelCancel">Mantener</AlertDialogCancel>
+          <AlertDialogAction @click="confirmCancel" variant="destructive">
+            Cancelar sesión
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from "vue";
 import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -113,14 +304,50 @@ import { userService } from '../api/userService';
 import { sessionsService } from '../api/sessionsService';
 import { useRouter } from "vue-router";
 
-const calendarOptions = ref({
-  plugins: [dayGridPlugin],
-  initialView: 'dayGridMonth',
-  timeZone: 'Europe/Madrid',
-  events: [],
-  eventColor: '#3b82f6',
-  height: 'auto',
-});
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import type { DateValue } from '@internationalized/date'
+import { DateFormatter, getLocalTimeZone, today, parseDate } from '@internationalized/date'
+import { CheckIcon, ChevronsUpDownIcon, CalendarIcon, AlertCircleIcon } from 'lucide-vue-next'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
 
 
 const showModal = ref(false)
@@ -135,10 +362,97 @@ const newSession = ref({ patientId: '', date: '', startTime: '', endTime: '' })
 const updateForm = ref({ date: '', startTime: '', endTime: '' })
 const sessionsList = ref([])
 const showUpdateModal = ref(false)
+const patient = ref(null)
+const therapist = ref(null)
+const openCB = ref(false)
+const defaultPlaceholder = today(getLocalTimeZone())
+const df = new DateFormatter('es-ES', {
+  dateStyle: 'long',
+})
+const showOverlapDialog = ref(false)
+const overlapAction = ref<null | (() => Promise<void>)>(null)
+const showCancelDialog = ref(false)
+const cancelAction = ref<null | (() => Promise<void>)>(null)
+const newSessionError = ref('')
+const updSessionError = ref('')
+
+const confirmOverlap = async () => {
+  if (overlapAction.value) {
+    await overlapAction.value()
+  }
+  overlapAction.value = null
+  showOverlapDialog.value = false
+}
+
+const cancelOverlap = () => {
+  overlapAction.value = null
+  showOverlapDialog.value = false
+}
+
+const confirmCancel = async () => {
+  if (cancelAction.value) {
+    await cancelAction.value()
+  }
+  cancelAction.value = null
+  showCancelDialog.value = false
+}
+
+const cancelCancel = () => {
+  cancelAction.value = null
+  showCancelDialog.value = false
+}
+
+
+const calendarOptions = ref({
+  plugins: [dayGridPlugin],
+  initialView: 'dayGridMonth',
+  locale: 'es',
+  events: [],
+  headerToolbar: {
+    left: '',
+    center: '',
+    right: ''
+  },
+    titleFormat: { // aquí personalizas el título del mes
+    year: 'numeric',
+    month: 'long'
+  },
+  buttonText: {
+    today: 'Hoy',
+    month: 'Mes',
+    week: 'Semana',
+    day: 'Día'
+  },
+  eventTimeFormat: {
+    hour: '2-digit',
+    minute: '2-digit',
+    meridiem: false,
+    hour12: false
+  },
+  eventClick: null,
+  firstDay: 1,
+  height: 'auto',
+    customButtons: {
+    customCreateButton: {
+      text: 'Crear nueva sesión',
+      click: () => {
+        showCreateModal.value = true;
+      }
+    }
+  },
+})
 
 onMounted(async () => {
   try {
     user.value = await userService.getCurrentUser()
+    if (user.value && user.value.type === 'therapist') {
+      calendarOptions.value.headerToolbar.left = 'prev,next today';
+      calendarOptions.value.headerToolbar.center = 'title';
+      calendarOptions.value.headerToolbar.right = 'customCreateButton';
+    } else {
+      calendarOptions.value.headerToolbar.left = 'title';
+      calendarOptions.value.headerToolbar.right = 'prev,next today';
+    }
   } catch (e) {
     user.value = null
   }
@@ -149,20 +463,40 @@ onMounted(async () => {
   } catch (e) {
     patients.value = []
   }
-
   await loadSessions()
   try {
     activeSession.value = await sessionsService.getActiveSession()
     console.log('Active session:', activeSession.value)
   } catch (e) {
     activeSession.value = null
-  } finally {
-    loading.value = false
   }
+  // Rebuild events once we know the active session, so green class applies
+  await loadSessions()
+  loading.value = false
 });
 
-function handleEventClick(info) {
+async function handleEventClick(info) {
   selectedSession.value = info.event.extendedProps?.session || null
+  
+  // Load patient or therapist for this specific session
+  if (selectedSession.value) {
+    if (user.value?.type === 'therapist') {
+      try {
+        patient.value = await userService.getUserById(selectedSession.value.patient_id)
+      } catch (e) {
+        console.error('Error loading patient:', e)
+        patient.value = null
+      }
+    } else {
+      try {
+        therapist.value = await userService.getUserById(selectedSession.value.therapist_id)
+      } catch (e) {
+        console.error('Error loading therapist:', e)
+        therapist.value = null
+      }
+    }
+  }
+  
   showModal.value = true
 }
 
@@ -177,24 +511,26 @@ const isSessionActive = (session) => {
 }
 
 const eliminarSesion = async (sessionId) => {
-  const ok = confirm('¿Estás seguro de que deseas cancelar esta sesión?')
-  if (!ok) return
+  cancelAction.value = async () => await doDeleteSession(sessionId)
+  showCancelDialog.value = true
+}
 
+const doDeleteSession = async (sessionId) => {
   try {
     await sessionsService.deleteSession(sessionId)
-    alert('Sesión cancelada correctamente')
+    toast.success('Sesión cancelada correctamente')
     await loadSessions()
     closeModal()
   } catch (e) {
     console.error('Error cancelando sesión:', e)
-    alert('No se pudo cancelar la sesión')
+    toast.error('No se pudo cancelar la sesión')
   }
 }
 
 const actualizarSesion = (sessionId) => {
   const session = sessionsList.value.find(s => s.id === sessionId)
   if (!session) {
-    alert('Sesión no encontrada')
+    toast.error('Sesión no encontrada')
     return
   }
   selectedSession.value = { ...session }
@@ -203,7 +539,7 @@ const actualizarSesion = (sessionId) => {
   const end = utcToLocalInput(session.end_date);
 
   updateForm.value = {
-    date: start.date,
+    date: parseDate(start.date),
     startTime: start.time,
     endTime: end.time
   }
@@ -215,6 +551,10 @@ const actualizarSesion = (sessionId) => {
 
 const actualizarSesionConfirm = async (sessionId) => {
   try {
+    if (updateForm.value.startTime >= updateForm.value.endTime) {
+      updSessionError.value = 'La hora de inicio debe ser anterior a la hora de fin'
+      return
+    }
 
     const startDateTime = localToUTC(updateForm.value.date, updateForm.value.startTime)
     const endDateTime = localToUTC(updateForm.value.date, updateForm.value.endTime)
@@ -230,24 +570,37 @@ const actualizarSesionConfirm = async (sessionId) => {
     })
 
     if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
+      overlapAction.value = async () => await doUpdateSession(sessionId)
+      showOverlapDialog.value = true
+      return
     }
 
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    
-    await sessionsService.updateSession(sessionId, session_data)
-    alert('Sesión actualizada correctamente')
-    await loadSessions()
-    closeUpdate()
-    closeModal()
+    await doUpdateSession(sessionId)
+
   } catch (e) {
     console.error('Error actualizando sesión:', e)
-    alert('No se pudo actualizar la sesión')
+    toast.error('No se pudo actualizar la sesión')
   }
+}
+
+const doUpdateSession = async (sessionId) => {
+  const startDateTime = localToUTC(updateForm.value.date, updateForm.value.startTime)
+  const endDateTime = localToUTC(updateForm.value.date, updateForm.value.endTime)
+  const session_data = {
+    start_date: startDateTime,
+    end_date: endDateTime
+  }
+  
+  await sessionsService.updateSession(sessionId, session_data)
+  try {
+    activeSession.value = await sessionsService.getActiveSession()
+  } catch (e) {
+    activeSession.value = null
+  }
+  await loadSessions()
+  closeUpdate()
+  closeModal()
+  toast.success('Sesión actualizada correctamente')
 }
 
 const canModify = (session) => {
@@ -259,8 +612,14 @@ const canModify = (session) => {
 
 const createSession = async () => {
   try {
+    newSessionError.value = ''
     if (!newSession.value.patientId || !newSession.value.date || !newSession.value.startTime || !newSession.value.endTime) {
-      alert('Completa todos los campos')
+      newSessionError.value = 'Completa todos los campos'
+      return
+    }
+
+    if (newSession.value.startTime >= newSession.value.endTime) {
+      newSessionError.value = 'La hora de inicio debe ser anterior a la hora de fin'
       return
     }
 
@@ -268,6 +627,10 @@ const createSession = async () => {
     const endDateTime = localToUTC(newSession.value.date, newSession.value.endTime);
     const newStart = new Date(startDateTime);
     const newEnd = new Date(endDateTime);
+    const session_data = {
+      start_date: startDateTime,
+      end_date: endDateTime,
+    }
     
     const overlap = sessionsList.value.find(s => {
       if (!s.start_date || !s.end_date) return false
@@ -277,22 +640,29 @@ const createSession = async () => {
     })
 
     if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
+      overlapAction.value = async () => await doCreateSession(session_data)
+      showOverlapDialog.value = true
+      return
     }
 
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    const created = await sessionsService.createSession(newSession.value.patientId, session_data)
-    console.log('Sesión creada:', created)
-    await loadSessions()
-    closeCreate()
+    await doCreateSession(session_data)
   } catch (e) {
     console.error('Error creando sesión:', e)
-    alert('No se pudo crear la sesión')
+    toast.error('No se pudo crear la sesión')
   }
+}
+
+const doCreateSession = async (session_data) => {
+  const created = await sessionsService.createSession(newSession.value.patientId, session_data)
+  console.log('Sesión creada:', created)
+  try {
+    activeSession.value = await sessionsService.getActiveSession()
+  } catch (e) {
+    activeSession.value = null
+  }
+  await loadSessions()
+  closeCreate()
+  toast.success('Sesión creada correctamente')
 }
 
 const loadSessions = async () => {
@@ -302,14 +672,39 @@ const loadSessions = async () => {
 
   console.log('Sesiones cargadas:', list);
 
+  // Build event titles: for therapists show patient name + time, for patients show "Sesión"
+  const eventTitles = await Promise.all(
+    list.map(async (s) => {
+      if (user.value?.type === 'therapist') {
+        try {
+          const patientData = await userService.getUserById(s.patient_id)
+          return patientData.full_name
+        } catch (e) {
+          console.error('Error getting patient:', e)
+          return "Sesión"
+        }
+      }
+      else{
+        try {
+          const therapistData = await userService.getUserById(s.therapist_id)
+          return therapistData.full_name
+        } catch (e) {
+          console.error('Error getting therapist:', e)
+          return "Sesión"
+        }
+      }
+    })
+  )
+
   calendarOptions.value = {
     ...calendarOptions.value,
-    events: list.map(s => ({
-      title: "Sesión",
+    events: list.map((s, idx) => ({
+      title: eventTitles[idx],
       start: dateToLocalString(new Date(ensureUTCString(s.start_date))),
       end: dateToLocalString(new Date(ensureUTCString(s.end_date))),
       displayEventTime: true,
       extendedProps: { session: s },
+      classNames: isSessionActive(s) ? ['active-event'] : (s.ended_at ? [] : ['pending-event']),
     })),
     eventClick: handleEventClick,
   };
@@ -318,6 +713,7 @@ const loadSessions = async () => {
 const closeCreate = () => {
   showCreateModal.value = false
   newSession.value = { patientId: '', date: '', startTime: '', endTime: '' }
+  newSessionError.value = ''
 }
 
 const closeUpdate = () => {
@@ -343,7 +739,9 @@ const formatLocalDate = (utcString) => {
   });
 }
 
-const localToUTC = (dateStr, timeStr) => {
+const localToUTC = (dateInput, timeStr) => {
+  // Si es un DateValue, convertir a string YYYY-MM-DD
+  const dateStr = dateInput?.toString ? dateInput.toString() : dateInput;
   const date = new Date(`${dateStr}T${timeStr}:00`);
   return date.toISOString();
 }
@@ -380,118 +778,130 @@ const utcToLocalInput = (utcString) => {
 </script>
 
 <style>
+.fc-shadcn {
+  --fc-border-color: #e2e8f0;
+  --fc-button-bg-color: #059669;
+  --fc-button-border-color: #059669;
+  --fc-button-text-color: #f8fafc;
+  --fc-button-hover-bg-color: #047857;
+  --fc-button-hover-border-color: #047857;
+  --fc-today-bg-color: #f1f5f9;
+  --fc-neutral-bg-color: #ffffff;
+  --fc-page-bg-color: #ffffff;
+  --fc-list-event-dot-width: 8px;
+  --fc-event-bg-color: #0ea5e9;
+  --fc-event-border-color: #0ea5e9;
+  --fc-event-text-color: #f8fafc;
+}
 
-.toolbar {
+.fc-shadcn .fc-toolbar {
+  padding-top: 0.75rem;
+  padding-right: 1rem;
+  padding-left: 1rem;
+  gap: 0.65rem;
+}
+
+.fc-shadcn .fc-toolbar-title {
+  padding-top: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fc-toolbar-title::first-letter {
+  text-transform: uppercase; /* solo la primera letra en mayúscula */
+}
+
+.fc-shadcn .fc-button {
+  border-radius: 0.75rem;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.18s ease;
+}
+
+.fc-shadcn .fc-button:focus,
+.fc-shadcn .fc-button:focus-visible,
+.fc-shadcn .fc-button:active {
+  outline: none;
+  box-shadow: none;
+}
+
+.fc-shadcn .fc-toolbar-chunk {
   display: flex;
-  justify-content: flex-end;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.create-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
-  align-items: end;
-}
-
-.create-form label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
-  color: #111;
-  gap: 0.25rem;
-}
-
-.create-form input,
-.create-form select {
-  padding: 0.45rem 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-}
-
-.link {
-  background: transparent;
-  border: none;
-  color: #2563eb;
-  cursor: pointer;
-  padding: 0.25rem 0.35rem;
-}
-
-.muted {
-  color: #6b7280;
-  margin: 0;
-  grid-column: 1 / -1;
-}
-
-.calendar-container {
-  max-width: 900px;
-  margin: auto;
-  padding: 1rem;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
 }
 
-.modal {
-  background: white;
-  padding: 1rem 1.25rem;
-  border-radius: 8px;
-  max-width: 420px;
-  width: 100%;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.18);
-  color: #111;
+.fc-shadcn .fc-daygrid-event {
+  border-radius: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
 }
 
-.modal h3 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
+.fc-shadcn .fc-daygrid-event:hover {
+  filter: brightness(0.97);
 }
 
-.modal dl {
-  margin: 0;
+.fc-shadcn .pending-event {
+  background-color: #6366f1;
+  border-color: #6366f1;
 }
 
-.modal dt {
+.fc-shadcn .active-event {
+  background-color: #48d421;
+  border-color: #48d421;
+}
+
+.fc-shadcn .fc-daygrid-day-number {
+  color: #0f172a;
   font-weight: 600;
 }
 
-.modal dd {
-  margin: 0 0 0.4rem 0;
-  color: #333;
+
+.fc-shadcn .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
+  background-color: #fffcd5 !important;
+  border: 1px solid #899141;
+  border-radius: 0.5rem;
 }
 
-.modal .actions {
-  text-align: right;
-  margin-top: 0.75rem;
+/* Número del día ligeramente más destacado */
+.fc-shadcn .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  font-weight: 700; /* un poquito más pesado */
 }
 
-.modal button {
-  padding: 0.35rem 0.75rem;
-  border: 1px solid #ccc;
-  background: #f4f4f4;
-  border-radius: 4px;
-  cursor: pointer;
+.fc-shadcn .fc-col-header-cell-cushion,
+.fc-shadcn .fc-daygrid-day-number {
+  padding: 0.5rem;
 }
 
-.modal button:hover {
-  background: #e9e9e9;
+.fc-shadcn .fc-col-header-cell-cushion {
+  font-size: 0.85rem;
+  color: #475569;
+  text-transform: capitalize;
 }
 
-.btn-primary {
-  background: #3b82f6 !important;
-  color: white !important;
-  border-color: #3b82f6 !important;
+.fc-shadcn .fc-daygrid-day-frame {
+  padding: 0.4rem;
+  border-radius: 0.75rem;
 }
 
-.btn-primary:hover {
-  background: #2563eb !important;
+.fc-shadcn .fc-daygrid-day.fc-day-sat,
+.fc-shadcn .fc-daygrid-day.fc-day-sun {
+  background-color: #f8fafc;
 }
+
+.fc-shadcn .fc-scrollgrid-sync-table {
+  border-radius: 0.75rem;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: #e2e8f0;
+}
+
+
 </style>

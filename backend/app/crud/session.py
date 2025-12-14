@@ -6,6 +6,34 @@ import app.services as services
 from datetime import datetime
 
 
+def finalize_expired_sessions(db: Session, user_id: int | None = None):
+    """Auto-finalize sessions that passed their scheduled end_date without being ended.
+
+    If user_id is provided, scope to sessions where the user is patient or therapist
+    to minimize the update set for per-request calls.
+    """
+    query = db.query(models.Session).filter(
+            models.Session.ended_at == None,
+            models.Session.end_date != None,
+            models.Session.end_date <= datetime.utcnow()
+    )
+
+    if user_id is not None:
+        query = query.filter(
+            (models.Session.patient_id == user_id) | (models.Session.therapist_id == user_id)
+        )
+
+    to_close = query.all()
+    if not to_close:
+        return 0
+
+    for session in to_close:
+        session.ended_at = session.end_date
+
+    db.commit()
+    return len(to_close)
+
+
 def create_session_for_users(db: Session, patient_id: int, therapist_id: int, session: schemas.SessionCreate):
     patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
     therapist = db.query(models.Therapist).filter(models.Therapist.id == therapist_id).first()
