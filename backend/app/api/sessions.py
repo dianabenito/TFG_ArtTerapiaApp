@@ -24,6 +24,9 @@ def create_session_for_patient(patient_id: int,
     patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
+    if session.start_date >= session.end_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Start date must be before end date")
     return crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
 
 @router.put("/session/{session_id}", response_model=schemas.Session)
@@ -40,6 +43,11 @@ def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionD
         db_session.start_date = session.start_date
     if session.end_date is not None:
         db_session.end_date = session.end_date
+
+    # Validate dates after update
+    if db_session.start_date >= db_session.end_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Start date must be before end date")
 
     db.commit()
     db.refresh(db_session)

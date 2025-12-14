@@ -68,7 +68,6 @@
 
         <form class="create-form" @submit.prevent="createSession">
           <div class="grid gap-4">
-
             <!-- Paciente -->
             <div class="grid gap-2">
               <Label for="patient">Paciente</Label>
@@ -136,6 +135,7 @@
                   <Calendar
                     v-model="newSession.date"
                     :default-placeholder="defaultPlaceholder"
+                    :min-value="today(getLocalTimeZone())"
                     layout="month-and-year"
                     initial-focus
                     @update:model-value="close"
@@ -146,7 +146,7 @@
 
             <!-- Hora inicio -->
             <div class="grid gap-2">
-              <Label for="horaInicio">Hora inicio</Label>
+              <Label for="horaInicio">Hora de inicio</Label>
               <Input
                 type="time"
                 v-model="newSession.startTime"
@@ -156,13 +156,21 @@
 
             <!-- Hora fin -->
             <div class="grid gap-2">
-              <Label for="horaFin">Hora fin</Label>
+              <Label for="horaFin">Hora de fin</Label>
               <Input
                 type="time"
                 v-model="newSession.endTime"
                 class="w-full"
               />
             </div>
+
+            <Alert v-if="newSessionError" class="bg-red-100 text-red-800 border border-red-300">
+              <AlertCircleIcon class="h-4 w-4" />
+              <AlertTitle>Error al crear la sesión</AlertTitle>
+              <AlertDescription class="text-red-800">
+                {{ newSessionError }}
+              </AlertDescription>
+            </Alert>
 
             <!-- Botón de confirmación -->
             <div class="flex justify-end mt-4">
@@ -174,7 +182,7 @@
       </DialogContent>
     </Dialog>
 
-        <Dialog :open="showUpdateModal" @update:open="(val) => !val && closeUpdate()">
+    <Dialog :open="showUpdateModal" @update:open="(val) => !val && closeUpdate()">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Actualizar la fecha de la sesión</DialogTitle>
@@ -203,6 +211,7 @@
                   <Calendar
                     v-model="updateForm.date"
                     :default-placeholder="defaultPlaceholder"
+                    :min-value="today(getLocalTimeZone())"
                     layout="month-and-year"
                     initial-focus
                     @update:model-value="close"
@@ -213,7 +222,7 @@
 
             <!-- Hora inicio -->
             <div class="grid gap-2">
-              <Label for="horaInicio">Hora inicio</Label>
+              <Label for="horaInicio">Hora de inicio</Label>
               <Input
                 type="time"
                 v-model="updateForm.startTime"
@@ -223,13 +232,22 @@
 
             <!-- Hora fin -->
             <div class="grid gap-2">
-              <Label for="horaFin">Hora fin</Label>
+              <Label for="horaFin">Hora de fin</Label>
               <Input
                 type="time"
                 v-model="updateForm.endTime"
                 class="w-full"
               />
             </div>
+
+            <Alert v-if="updSessionError" class="bg-red-100 text-red-800 border border-red-300">
+              <AlertCircleIcon class="h-4 w-4" />
+              <AlertTitle>Error al actualizar la sesión</AlertTitle>
+              <AlertDescription class="text-red-800">
+                {{ updSessionError }}
+              </AlertDescription>
+            </Alert>
+
             <!-- Botón de confirmación -->
             <div class="flex justify-end mt-4">
               <Button type="submit" variant="default">Confirmar</Button>
@@ -238,6 +256,43 @@
         </form>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog :open="showOverlapDialog" @update:open="showOverlapDialog = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión solapada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión que intentas actualizar coincide con otra ya agendada.
+            ¿Deseas continuar igualmente?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="cancelOverlap">Cancelar</AlertDialogCancel>
+          <AlertDialogAction @click="confirmOverlap">
+            Continuar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="showCancelDialog" @update:open="showCancelDialog = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancelar sesión</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción cancelará la sesión seleccionada. ¿Deseas continuar?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="cancelCancel">Mantener</AlertDialogCancel>
+          <AlertDialogAction @click="confirmCancel" variant="destructive">
+            Cancelar sesión
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -264,7 +319,7 @@ import {
 } from '@/components/ui/dialog'
 import type { DateValue } from '@internationalized/date'
 import { DateFormatter, getLocalTimeZone, today, parseDate } from '@internationalized/date'
-import { CheckIcon, ChevronsUpDownIcon, CalendarIcon } from 'lucide-vue-next'
+import { CheckIcon, ChevronsUpDownIcon, CalendarIcon, AlertCircleIcon } from 'lucide-vue-next'
 import {
   Command,
   CommandEmpty,
@@ -280,6 +335,20 @@ import {
 } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { toast } from 'vue-sonner'
+
 
 const showModal = ref(false)
 const selectedSession = ref(null)
@@ -300,6 +369,39 @@ const defaultPlaceholder = today(getLocalTimeZone())
 const df = new DateFormatter('es-ES', {
   dateStyle: 'long',
 })
+const showOverlapDialog = ref(false)
+const overlapAction = ref<null | (() => Promise<void>)>(null)
+const showCancelDialog = ref(false)
+const cancelAction = ref<null | (() => Promise<void>)>(null)
+const newSessionError = ref('')
+const updSessionError = ref('')
+
+const confirmOverlap = async () => {
+  if (overlapAction.value) {
+    await overlapAction.value()
+  }
+  overlapAction.value = null
+  showOverlapDialog.value = false
+}
+
+const cancelOverlap = () => {
+  overlapAction.value = null
+  showOverlapDialog.value = false
+}
+
+const confirmCancel = async () => {
+  if (cancelAction.value) {
+    await cancelAction.value()
+  }
+  cancelAction.value = null
+  showCancelDialog.value = false
+}
+
+const cancelCancel = () => {
+  cancelAction.value = null
+  showCancelDialog.value = false
+}
+
 
 const calendarOptions = ref({
   plugins: [dayGridPlugin],
@@ -367,9 +469,10 @@ onMounted(async () => {
     console.log('Active session:', activeSession.value)
   } catch (e) {
     activeSession.value = null
-  } finally {
-    loading.value = false
   }
+  // Rebuild events once we know the active session, so green class applies
+  await loadSessions()
+  loading.value = false
 });
 
 async function handleEventClick(info) {
@@ -408,24 +511,26 @@ const isSessionActive = (session) => {
 }
 
 const eliminarSesion = async (sessionId) => {
-  const ok = confirm('¿Estás seguro de que deseas cancelar esta sesión?')
-  if (!ok) return
+  cancelAction.value = async () => await doDeleteSession(sessionId)
+  showCancelDialog.value = true
+}
 
+const doDeleteSession = async (sessionId) => {
   try {
     await sessionsService.deleteSession(sessionId)
-    alert('Sesión cancelada correctamente')
+    toast.success('Sesión cancelada correctamente')
     await loadSessions()
     closeModal()
   } catch (e) {
     console.error('Error cancelando sesión:', e)
-    alert('No se pudo cancelar la sesión')
+    toast.error('No se pudo cancelar la sesión')
   }
 }
 
 const actualizarSesion = (sessionId) => {
   const session = sessionsList.value.find(s => s.id === sessionId)
   if (!session) {
-    alert('Sesión no encontrada')
+    toast.error('Sesión no encontrada')
     return
   }
   selectedSession.value = { ...session }
@@ -446,6 +551,10 @@ const actualizarSesion = (sessionId) => {
 
 const actualizarSesionConfirm = async (sessionId) => {
   try {
+    if (updateForm.value.startTime >= updateForm.value.endTime) {
+      updSessionError.value = 'La hora de inicio debe ser anterior a la hora de fin'
+      return
+    }
 
     const startDateTime = localToUTC(updateForm.value.date, updateForm.value.startTime)
     const endDateTime = localToUTC(updateForm.value.date, updateForm.value.endTime)
@@ -461,29 +570,37 @@ const actualizarSesionConfirm = async (sessionId) => {
     })
 
     if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
+      overlapAction.value = async () => await doUpdateSession(sessionId)
+      showOverlapDialog.value = true
+      return
     }
 
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    
-    await sessionsService.updateSession(sessionId, session_data)
-    alert('Sesión actualizada correctamente')
-    await loadSessions()
-    try {
-      activeSession.value = await sessionsService.getActiveSession()
-    } catch (e) {
-      activeSession.value = null
-    }
-    closeUpdate()
-    closeModal()
+    await doUpdateSession(sessionId)
+
   } catch (e) {
     console.error('Error actualizando sesión:', e)
-    alert('No se pudo actualizar la sesión')
+    toast.error('No se pudo actualizar la sesión')
   }
+}
+
+const doUpdateSession = async (sessionId) => {
+  const startDateTime = localToUTC(updateForm.value.date, updateForm.value.startTime)
+  const endDateTime = localToUTC(updateForm.value.date, updateForm.value.endTime)
+  const session_data = {
+    start_date: startDateTime,
+    end_date: endDateTime
+  }
+  
+  await sessionsService.updateSession(sessionId, session_data)
+  try {
+    activeSession.value = await sessionsService.getActiveSession()
+  } catch (e) {
+    activeSession.value = null
+  }
+  await loadSessions()
+  closeUpdate()
+  closeModal()
+  toast.success('Sesión actualizada correctamente')
 }
 
 const canModify = (session) => {
@@ -495,8 +612,14 @@ const canModify = (session) => {
 
 const createSession = async () => {
   try {
+    newSessionError.value = ''
     if (!newSession.value.patientId || !newSession.value.date || !newSession.value.startTime || !newSession.value.endTime) {
-      alert('Completa todos los campos')
+      newSessionError.value = 'Completa todos los campos'
+      return
+    }
+
+    if (newSession.value.startTime >= newSession.value.endTime) {
+      newSessionError.value = 'La hora de inicio debe ser anterior a la hora de fin'
       return
     }
 
@@ -504,6 +627,10 @@ const createSession = async () => {
     const endDateTime = localToUTC(newSession.value.date, newSession.value.endTime);
     const newStart = new Date(startDateTime);
     const newEnd = new Date(endDateTime);
+    const session_data = {
+      start_date: startDateTime,
+      end_date: endDateTime,
+    }
     
     const overlap = sessionsList.value.find(s => {
       if (!s.start_date || !s.end_date) return false
@@ -513,27 +640,29 @@ const createSession = async () => {
     })
 
     if (overlap) {
-      const ok = confirm('La sesión que intentas añadir coincide con otra sesión agendada. ¿Deseas continuar?')
-      if (!ok) return
+      overlapAction.value = async () => await doCreateSession(session_data)
+      showOverlapDialog.value = true
+      return
     }
 
-    const session_data = {
-      start_date: startDateTime,
-      end_date: endDateTime
-    }
-    const created = await sessionsService.createSession(newSession.value.patientId, session_data)
-    console.log('Sesión creada:', created)
-    await loadSessions()
-    try {
-      activeSession.value = await sessionsService.getActiveSession()
-    } catch (e) {
-      activeSession.value = null
-    }
-    closeCreate()
+    await doCreateSession(session_data)
   } catch (e) {
     console.error('Error creando sesión:', e)
-    alert('No se pudo crear la sesión')
+    toast.error('No se pudo crear la sesión')
   }
+}
+
+const doCreateSession = async (session_data) => {
+  const created = await sessionsService.createSession(newSession.value.patientId, session_data)
+  console.log('Sesión creada:', created)
+  try {
+    activeSession.value = await sessionsService.getActiveSession()
+  } catch (e) {
+    activeSession.value = null
+  }
+  await loadSessions()
+  closeCreate()
+  toast.success('Sesión creada correctamente')
 }
 
 const loadSessions = async () => {
@@ -575,7 +704,7 @@ const loadSessions = async () => {
       end: dateToLocalString(new Date(ensureUTCString(s.end_date))),
       displayEventTime: true,
       extendedProps: { session: s },
-      classNames: s.ended_at ? [] : ['pending-event'],
+      classNames: isSessionActive(s) ? ['active-event'] : (s.ended_at ? [] : ['pending-event']),
     })),
     eventClick: handleEventClick,
   };
@@ -584,6 +713,7 @@ const loadSessions = async () => {
 const closeCreate = () => {
   showCreateModal.value = false
   newSession.value = { patientId: '', date: '', startTime: '', endTime: '' }
+  newSessionError.value = ''
 }
 
 const closeUpdate = () => {
@@ -719,6 +849,11 @@ const utcToLocalInput = (utcString) => {
 .fc-shadcn .pending-event {
   background-color: #6366f1;
   border-color: #6366f1;
+}
+
+.fc-shadcn .active-event {
+  background-color: #48d421;
+  border-color: #48d421;
 }
 
 .fc-shadcn .fc-daygrid-day-number {
