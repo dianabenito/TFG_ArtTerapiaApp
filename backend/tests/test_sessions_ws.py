@@ -21,8 +21,8 @@ def test_sessions_and_websocket_flow(client):
     ptoken = get_token_for_email(client, patient['email'])
 
     # create a session using therapist endpoint
-    now = datetime.utcnow().isoformat()
-    payload = {"start_date": now, "end_date": now}
+    now = datetime.utcnow()
+    payload = {"start_date": now.isoformat(), "end_date": (now + timedelta(minutes=1)).isoformat()}
     # use therapist to create session for patient
     r = client.post(f"/sessions/session/{patient['id']}", json=payload, headers={'Authorization': f'Bearer {ttoken}'})
     assert r.status_code == 200
@@ -80,8 +80,8 @@ def test_patient_cannot_create_or_end_session_and_nonparticipant_forbidden(clien
     ptoken = r.json()['access_token']
 
     # patient tries to create session (therapist-only)
-    now = datetime.utcnow().isoformat()
-    payload = {"start_date": now, "end_date": now}
+    now = datetime.utcnow()
+    payload = {"start_date": now.isoformat(), "end_date": (now + timedelta(minutes=1)).isoformat()}
     r = client.post(f"/sessions/session/{patient['id']}", json=payload, headers={'Authorization': f'Bearer {ptoken}'})
     assert r.status_code == 403
 
@@ -117,8 +117,8 @@ def test_websocket_missing_or_invalid_token(client):
     rlogin = client.post('/users/login/', data={'username': therapist['email'], 'password': 'Password1!'})
     assert rlogin.status_code == 200
     ttoken = rlogin.json()['access_token']
-    now = datetime.utcnow().isoformat()
-    r = client.post('/sessions/session/1', json={"start_date": now, "end_date": now}, headers={'Authorization': f'Bearer {ttoken}'})
+    now = datetime.utcnow()
+    r = client.post('/sessions/session/1', json={"start_date": now.isoformat(), "end_date": (now + timedelta(minutes=1)).isoformat()}, headers={'Authorization': f'Bearer {ttoken}'})
     assert r.status_code == 200
     sid = r.json()['id']
 
@@ -147,21 +147,24 @@ def test_get_my_sessions_success_for_user(client):
     # Therapist creates 3 sessions for the patient
     now = datetime.utcnow()
     future1 = (now + timedelta(days=1)).isoformat()
+    future1_end = (now + timedelta(days=1, hours=1)).isoformat()
     future2 = (now + timedelta(days=2)).isoformat()
+    future2_end = (now + timedelta(days=2, hours=1)).isoformat()
     future3 = (now + timedelta(days=3)).isoformat()
+    future3_end = (now + timedelta(days=3, hours=1)).isoformat()
     
     s1 = client.post(f"/sessions/session/{patient['id']}", 
-                     json={"start_date": future1, "end_date": future1}, 
+                     json={"start_date": future1, "end_date": future1_end}, 
                      headers={'Authorization': f'Bearer {ttoken}'})
     assert s1.status_code == 200
     
     s2 = client.post(f"/sessions/session/{patient['id']}", 
-                     json={"start_date": future2, "end_date": future2}, 
+                     json={"start_date": future2, "end_date": future2_end}, 
                      headers={'Authorization': f'Bearer {ttoken}'})
     assert s2.status_code == 200
     
     s3 = client.post(f"/sessions/session/{patient['id']}", 
-                     json={"start_date": future3, "end_date": future3}, 
+                     json={"start_date": future3, "end_date": future3_end}, 
                      headers={'Authorization': f'Bearer {ttoken}'})
     assert s3.status_code == 200
     
@@ -291,9 +294,9 @@ def test_websocket_chat_json_message_format(client):
     ptoken = get_token_for_email(client, patient['email'])
     
     # Create active session
-    now = datetime.utcnow().isoformat()
+    now = datetime.utcnow()
     r = client.post(f"/sessions/session/{patient['id']}", 
-                    json={"start_date": now, "end_date": now}, 
+                    json={"start_date": now.isoformat(), "end_date": (now + timedelta(minutes=1)).isoformat()}, 
                     headers={'Authorization': f'Bearer {ttoken}'})
     assert r.status_code == 200
     sid = r.json()['id']
@@ -336,9 +339,9 @@ def test_websocket_plain_text_converted_to_chat_message(client):
     ptoken = get_token_for_email(client, patient['email'])
     
     # Create active session
-    now = datetime.utcnow().isoformat()
+    now = datetime.utcnow()
     r = client.post(f"/sessions/session/{patient['id']}", 
-                    json={"start_date": now, "end_date": now}, 
+                    json={"start_date": now.isoformat(), "end_date": (now + timedelta(minutes=1)).isoformat()}, 
                     headers={'Authorization': f'Bearer {ttoken}'})
     assert r.status_code == 200
     sid = r.json()['id']
@@ -368,9 +371,9 @@ def test_websocket_message_when_other_not_connected(client):
     ptoken = get_token_for_email(client, patient['email'])
     
     # Create session
-    now = datetime.utcnow().isoformat()
+    now = datetime.utcnow()
     r = client.post(f"/sessions/session/{patient['id']}", 
-                    json={"start_date": now, "end_date": now}, 
+                    json={"start_date": now.isoformat(), "end_date": (now + timedelta(minutes=1)).isoformat()}, 
                     headers={'Authorization': f'Bearer {ttoken}'})
     assert r.status_code == 200
     sid = r.json()['id']
