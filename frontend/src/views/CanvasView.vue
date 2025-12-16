@@ -86,7 +86,10 @@ export default {
       // Aquí puedes enviarlo a tu backend si lo quieres almacenar
     },
     async uploadSavedImage() {
-      if (!this.savedImage) return
+      if (!this.savedImage) {
+        alert('No hay dibujo guardado para subir.')
+        return
+      }
       // convert dataURL to blob
       const dataurl = this.savedImage
       const arr = dataurl.split(',')
@@ -118,8 +121,9 @@ export default {
           this.$router.push({ path: '/generation/', query: { image: fname } })
         }
       } catch (e) {
+        const detail = e?.response?.data?.detail || e?.message || String(e)
         console.error('Error uploading drawn image', e)
-        alert('Error subiendo el dibujo')
+        alert('Error subiendo el dibujo: ' + detail)
       }
     },
 

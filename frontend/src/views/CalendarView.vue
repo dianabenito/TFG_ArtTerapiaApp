@@ -43,7 +43,7 @@
           </dl>
 
           <div class="mt-4 flex justify-end gap-2">
-            <Button v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
+            <Button class="bg-cyan-600" v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
               Ir a sesión activa
             </Button>
             <Button v-if="user?.type==='therapist' && canModify(selectedSession)" variant="destructive" @click="eliminarSesion(selectedSession.id)">
@@ -148,6 +148,7 @@
             <div class="grid gap-2">
               <Label for="horaInicio">Hora de inicio</Label>
               <Input
+                id="horaInicio"
                 type="time"
                 v-model="newSession.startTime"
                 class="w-full"
@@ -158,6 +159,7 @@
             <div class="grid gap-2">
               <Label for="horaFin">Hora de fin</Label>
               <Input
+                id="horaFin"
                 type="time"
                 v-model="newSession.endTime"
                 class="w-full"

@@ -1,11 +1,31 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService.js'
 import { sessionsService } from '../api/sessionsService.js'
-
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from '../stores/toastStore.js'
+
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-vue-next"
+import { Spinner } from '@/components/ui/spinner'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { FolderOpen, Brush } from 'lucide-vue-next'
+
 const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
 const router = useRouter()
@@ -39,12 +59,16 @@ const combinedGallery = computed(() => {
   return [...t, ...g, ...u]
 })
 
+const showMultiSelectMode = ref(false)
 const multiSelectMode = ref(false)            // si estamos en modo selección múltiple
 const selectedImages = ref([])                // array de imágenes seleccionadas
 const minMultiSelect = 2
 const maxMultiSelect = 4
 
 const showGallery = ref(false)
+
+// Tab control for draw modal
+const activeDrawTab = ref('upload')
 
 // Refine modal state
 const showRefineModal = ref(false)
@@ -113,7 +137,7 @@ onMounted(async () => {
       // si la sesión ya está finalizada, mostrar alerta y redirigir al home
       if (sessionInfo.value?.ended_at) {
         try {
-          alert('La sesión ha sido finalizada por el terapeuta.')
+          alert('La sesión ha finalizado.')
           router.push('/home')
           return
         } catch (e) {
@@ -135,6 +159,7 @@ onMounted(async () => {
     tempImageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
     prompt.value.promptText = localStorage.getItem('prompt')
     localStorage.removeItem('prompt')
+    activeDrawTab.value = 'draw' // Open 'draw' tab since image comes from canvas
     await createFromSketch(tempImageUrl.value)
     // refresh gallery to include it (in case DB record exists)
     try { await loadGallery() } catch (e) { /* ignore */ }
@@ -156,7 +181,7 @@ const sendChatMessage = () => {
 
 const generateImage = async (last_seed = null, inputImage = null) => {
   try {
-    isLoading.value = true
+    modalLoading.value = true
     tempImageUrl.value = ''
 
     // Only accept numeric seeds; ignore click events or other objects
@@ -196,13 +221,13 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     showToast('Error generando imagen: ' + detail, { type: 'error' })
     console.error('Error generating image:', e)
   } finally {
-    isLoading.value = false
+    modalLoading.value = false
   }
 }
 
 const createFromSketch = async(inputImage) => {
   try {
-    isLoading.value = true
+    modalLoading.value = true
     tempImageUrl.value = ''
     
     sketchPrompt.value.sketchText = prompt.value.promptText
@@ -229,12 +254,13 @@ const createFromSketch = async(inputImage) => {
     showToast('Error generando imagen: ' + detail, { type: 'error' })
     console.error('Error generating image:', e)
   } finally {
-    isLoading.value = false
+    modalLoading.value = false
   }
 }
 
 // Open refine modal: generate initial image and allow regenerations with same seed
 const openRefineModal = async () => {
+  tempImageUrl.value = ''
   showRefineModal.value = true
   prompt.value.seed = null
   modalLoading.value = false
@@ -353,6 +379,7 @@ const uploadAndTransformSketch = async () => {
     console.error(e)
   } finally {
     isLoading.value = false
+    prompt.value.promptText = ''
   }
 }
 
@@ -366,6 +393,7 @@ const openDrawModal = async () => {
   tempImageUrl.value = ''
   showDrawModal.value = true
   modalLoading.value = false
+  activeDrawTab.value = 'upload' // Reset to upload tab by default
 }
 
 
@@ -455,6 +483,18 @@ const selectImage = (img) => {
 }
 
 const openGalleryModal = () => {
+  showMultiSelectMode.value = false
+  selectedImages.value = []  
+  if (!combinedGallery.value.length) {
+    showToast('No hay imágenes en tu galería', { type: 'info' })
+    return
+  }
+  showGallery.value = true
+}
+
+const openGalleryModalMultiselect = () => {
+  showMultiSelectMode.value = true
+  multiSelectMode.value = true
   selectedImages.value = []  
   if (!combinedGallery.value.length) {
     showToast('No hay imágenes en tu galería', { type: 'info' })
@@ -492,10 +532,11 @@ const confirmMultiSelect = async () => {
   console.log('Imágenes seleccionadas para flujo Comfy:', selectedImages.value)
   showGallery.value = false
   multiSelectMode.value = false
+  showMultiSelectMode.value = false
 
   try {
-    isLoading.value = true
-    tempImageUrl.value = ''
+    modalLoading.value = true
+    imageUrl.value = ''
 
     // Preparar payload para el servicio
     const imagesPayload = {
@@ -507,8 +548,8 @@ const confirmMultiSelect = async () => {
     console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
-      tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
-      console.log('Imagen generada URL:', tempImageUrl.value)
+      imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      console.log('Imagen generada URL:', imageUrl.value)
       seedLastImg.value = response.seed
       // Refresh gallery to include the new image generated from multiple images
       try {
@@ -521,7 +562,7 @@ const confirmMultiSelect = async () => {
     showToast('Error generando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)), { type: 'error' })
     console.error('Error generating image from multiple images:', e)
   } finally {
-    isLoading.value = false
+    modalLoading.value = false
   }
 }
 
@@ -541,10 +582,10 @@ const drawSketch = async () => {
   <div>
     <!-- Overlay de carga -->
     <div v-if="isLoadingGallery" class="loading-overlay">
-      <p>Cargando galería...</p>
-    </div>
-    <div v-if="isLoading || modalLoading" class="loading-overlay">
-      <p>Generando imagen...</p>
+      <Card  class="w-full max-w-md p-6 flex items-center justify-center">
+        <Spinner class="size-8"/>
+        <span>Cargando galería...</span>
+      </Card>
     </div>
 
     <h1>Genera tu obra de Arteterapia</h1>
@@ -561,65 +602,473 @@ const drawSketch = async () => {
 
     <div style="margin-top: .5rem">
       <h2>Generar una nueva obra:</h2>
-      <button @click="openRefineModal()" :disabled="isLoading">Generar a partir de texto</button>
-      <button @click="openSelectImagesModal()" :disabled="isLoading">Generar a partir de imágenes</button>
-      <button @click="openDrawModal()" :disabled="isLoading">Generar a partir de esbozo</button>
+      <Button @click="openRefineModal()" :disabled="isLoading">Generar a partir de texto</Button>
+      <Button @click="openSelectImagesModal()" :disabled="isLoading">Generar a partir de imágenes</Button>
+      <Button @click="openDrawModal()" :disabled="isLoading">Generar a partir de esbozo</Button>
+      <Button @click="openGalleryModalMultiselect()" :disabled="isLoading">Mezclar varias imagenes</Button>
     </div>
 
-    <!-- Refine Modal -->
-    <div v-if="showRefineModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
-      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
-        <button class="close-btn" @click="showRefineModal = false">Cerrar</button>
-        <div>
-          <label>Prompt:</label>
-          <input v-model="prompt.promptText" type="text" style="width:100%;" />
-        </div>
-        <div style="margin-top:.5rem;">
-          <button @click="modalRegenerate" :disabled="modalLoading || !prompt.promptText.trim()">Crear con texto</button>
-          <button @click="modalTextConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
-        </div>
-        <div style="margin-top:.75rem;">
-          <div v-if="modalLoading">Generando...</div>
-          <div v-else-if="tempImageUrl">
-            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
-          </div>
-          <div v-else style="color:#666">Aún no hay imagen generada.</div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Images Modal -->
-    <div v-if="showImagesModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
-      <div class="modal" style="background:white;padding:1rem;max-width:760px;width:100%;border-radius:6px;">
-        <button class="close-btn" @click="showImagesModal = false">Cerrar</button>
-        <div style="margin-top:1rem;">
-            <label for="fileInput">Subir imagen desde galería:</label>
-            <input id="fileInput" type="file" accept="image/*" @change="onFileChange" />
-            <button @click="uploadUserImage" :disabled="isLoadingGallery || !uploadFile" style="margin-left:0.5rem;">
-                {{'Subir imagen' }}
-            </button>
-        </div>
-        <div>
-          <label>Prompt:</label>
-          <input v-model="prompt.promptText" type="text" style="width:100%;" />
-        </div>
-        <div style="margin-top:.5rem;">
-          <button v-if="tempImageUrl" @click="generateImage(null, tempImageUrl)" :disabled="isLoading || !prompt.promptText.trim()" style="margin-left:.5rem;">Crear añadiendo texto a la imagen</button>
-            <div>
-              Crear usando imágenes de la galería:
-              <button @click="openGalleryModal" :disabled="isLoadingGallery">Ver galería</button>
+    
+
+    <Dialog
+      :open="showRefineModal"
+      @update:open="(val) => !val && (showRefineModal = false)"
+    >
+      <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
+        <!-- HEADER -->
+        <DialogHeader>
+          <DialogTitle>Generar obra a partir de un prompt de texto</DialogTitle>
+          <DialogDescription>
+            Describe la obra que quieres crear y genera una imagen basada en tu descripción.
+          </DialogDescription>
+        </DialogHeader>
+
+        <!-- LAYOUT DOS COLUMNAS -->
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
+          <!-- COLUMNA IZQUIERDA · PROMPT -->
+          <div class="flex flex-col gap-4">
+            <div class="grid gap-2">
+              <Label for="promptText">
+                Descripción de la obra
+              </Label>
+              <Textarea
+                id="promptText"
+                v-model="prompt.promptText"
+                placeholder="Describe el contenido que quieres ver en tu obra."
+                class="min-h-[200px]"
+                :disabled="modalLoading"
+              />
             </div>
-          <button @click="modalImagesConfirm" :disabled="modalLoading || !tempImageUrl" style="margin-left:.5rem;">Confirmar</button>
-        </div>
-        <div style="margin-top:.75rem;">
-          <div v-if="modalLoading">Generando...</div>
-          <div v-else-if="tempImageUrl">
-            <img :src="tempImageUrl" alt="Modal preview" style="max-width:100%;height:auto;" />
+
+            <div class="flex justify-end">
+              <Button 
+                variant="default"
+                class="px-4 py-2"
+                @click="modalRegenerate"
+                :disabled="modalLoading || !prompt.promptText.trim()"
+              >
+                Generar imagen
+              </Button>
+            </div>
           </div>
-          <div v-else style="color:#666">Aún no hay imagen generada.</div>
+
+          <!-- DIVISOR -->
+          <div class="hidden md:flex items-stretch">
+            <div class="w-px bg-border" />
+          </div>
+
+          <!-- COLUMNA DERECHA · PREVISUALIZACIÓN -->
+          <Card class="h-full">
+            <CardContent
+              class="flex flex-col items-center justify-center h-full gap-4 py-6 text-center"
+            >
+              <!-- LOADING -->
+              <div
+                v-if="modalLoading"
+                class="flex flex-col items-center gap-3 text-muted-foreground"
+              >
+                <Loader2 class="h-6 w-6 animate-spin" />
+                <span class="text-sm">Generando imagen...</span>
+              </div>
+
+              <!-- IMAGEN GENERADA -->
+              <div
+                v-else-if="tempImageUrl"
+                class="flex flex-col items-center gap-4 w-full"
+              >
+                <img
+                  :src="tempImageUrl"
+                  alt="Previsualización de la obra"
+                  class="max-h-[360px] rounded-lg border object-contain"
+                />
+
+              </div>
+
+              <!-- ESTADO VACÍO -->
+              <div
+                v-else
+                class="flex flex-col items-center gap-2 text-muted-foreground"
+              >
+                <ImageIcon class="h-8 w-8 opacity-50" />
+                <span class="text-sm">
+                  Aún no hay ninguna imagen generada
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-    </div>
+        <div class="flex justify-center mt-3">
+          <Button 
+              :disabled="modalLoading || !tempImageUrl"
+            class="bg-green-600 hover:bg-green-700 text-white px-8 py-5 rounded-lg font-bold text-lg shadow-lg"          
+            @click="modalTextConfirm"
+          >
+            Confirmar imagen
+        </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+
+
+    <Dialog
+      :open="showImagesModal"
+      @update:open="(val) => !val && (showImagesModal = false)"
+    >
+      <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
+        <!-- HEADER -->
+        <DialogHeader>
+          <DialogTitle>Generar obra a partir de una imagen de entrada y un prompt de texto</DialogTitle>
+          <DialogDescription>
+            Sube una imagen desde tu biblioteca o selecciona una imagen existente de la galería, y añade una descripción para transformar la imagen en una nueva obra.
+          </DialogDescription>
+        </DialogHeader>
+
+        <!-- LAYOUT DOS COLUMNAS -->
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
+          <!-- COLUMNA IZQUIERDA · PROMPT -->
+          <div class="flex flex-col gap-4">
+            <Tabs default-value="upload">
+              <TabsList class="mx-auto mb-3">
+                <TabsTrigger value="upload">
+                  Subir imagen
+                </TabsTrigger>
+                <TabsTrigger value="gallery">
+                  Escoger de la galería
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload">
+                <div class="grid gap-2 mb-3">
+              
+                  <!-- Label + Input -->
+                  <Label for="fileInput">
+                    Paso 1: Sube una imagen de la biblioteca de archivos de tu ordenador:
+                  </Label>
+                                
+                  <div class="flex items-center gap-3">
+                    <!-- Botón seleccionar archivo -->
+                    <div class="relative shrink-0">
+                      <input
+                        id="fileInput"
+                        type="file"
+                        accept="image/*"
+                        @change="onFileChange"
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <Button variant="outline">
+                        <FolderOpen class="h-4 w-4" />
+                        <span>Seleccionar archivo</span>
+                      </Button>
+                    </div>
+
+                    <!-- Nombre del archivo -->
+                    <span class="text-sm text-muted-foreground truncate max-w-xs">
+                      {{ uploadFile ? uploadFile.name : 'Ningún archivo seleccionado' }}
+                    </span>
+                  </div>
+
+                </div>
+
+                <Button
+                  @click="uploadUserImage"
+                  :disabled="isLoadingGallery || !uploadFile"
+                  variant="default"
+                >
+                  Subir imagen
+                </Button>
+
+
+                <div class="h-px bg-border my-4" v-if="tempImageUrl"/>
+
+            
+                <div class="grid gap-2" v-if="tempImageUrl">
+                  <Label for="promptText">
+                    Paso 2: Describe la obra que quieres crear a partir de la imagen subida:
+                  </Label>
+                  <Textarea
+                    id="promptText"
+                    v-model="prompt.promptText"
+                    placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida."
+                    class="min-h-[200px]"
+                    :disabled="modalLoading"
+                  />
+                </div>
+
+                <div class="flex justify-start mt-3">
+                  <Button 
+                    v-if="tempImageUrl"
+                    variant="default"
+                    class="px-4 py-2"
+                    @click="generateImage(null, tempImageUrl)"
+                    :disabled="modalLoading || !prompt.promptText.trim()"
+                  >
+                    Convertir la imagen con texto
+                  </Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="gallery">
+                <div class="grid gap-2">
+                  <!-- Label + Input -->
+                  <Label>
+                    Paso 1: Escoge una imagen de la galería de imágenes:
+                  </Label>
+                  <Button 
+                    variant="default"
+                    class="px-4 py-2 w-fit mt-1"
+                    @click="openGalleryModal"
+                    :disabled="isLoadingGallery"
+                  >
+                    Ver galería
+                  </Button>
+                </div>
+
+                <div class="h-px bg-border my-4" v-if="tempImageUrl"/>
+            
+                <div class="grid gap-2" v-if="tempImageUrl">
+                  <Label for="promptText" class="leading-normal">
+                    Paso 2: Describe la obra que quieres crear a partir de la imagen seleccionada:
+                  </Label>
+                  <Textarea
+                    id="promptText"
+                    v-model="prompt.promptText"
+                    placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida."
+                    class="min-h-[200px]"
+                    :disabled="modalLoading"
+                  />
+                </div>
+
+                <div class="flex justify-start mt-3">
+                  <Button 
+                    v-if="tempImageUrl"
+                    variant="default"
+                    class="px-4 py-2"
+                    @click="generateImage(null, tempImageUrl)"
+                    :disabled="modalLoading || !prompt.promptText.trim()"
+                  >
+                    Convertir la imagen con texto
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <!-- DIVISOR -->
+          <div class="hidden md:flex items-stretch">
+            <div class="w-px bg-border" />
+          </div>
+
+          <!-- COLUMNA DERECHA · PREVISUALIZACIÓN -->
+          <Card class="h-full">
+            <CardContent
+              class="flex flex-col items-center justify-center h-full gap-4 py-6 text-center"
+            >
+              <!-- LOADING -->
+              <div
+                v-if="modalLoading"
+                class="flex flex-col items-center gap-3 text-muted-foreground"
+              >
+                <Loader2 class="h-6 w-6 animate-spin" />
+                <span class="text-sm">Generando imagen...</span>
+              </div>
+
+              <!-- IMAGEN GENERADA -->
+              <div
+                v-else-if="tempImageUrl"
+                class="flex flex-col items-center gap-4 w-full"
+              >
+                <img
+                  :src="tempImageUrl"
+                  alt="Previsualización de la obra"
+                  class="max-h-[360px] rounded-lg border object-contain"
+                />
+
+              </div>
+
+              <!-- ESTADO VACÍO -->
+              <div
+                v-else
+                class="flex flex-col items-center gap-2 text-muted-foreground"
+              >
+                <ImageIcon class="h-8 w-8 opacity-50" />
+                <span class="text-sm">
+                  Aún no hay ninguna imagen generada
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div class="flex justify-center mt-3">
+          <Button
+            :disabled="modalLoading || !tempImageUrl"
+            class="bg-green-600 hover:bg-green-700 text-white px-8 py-5 rounded-lg font-bold text-lg shadow-lg"          
+            @click="modalImagesConfirm"
+          >
+            Confirmar imagen
+        </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+
+        <Dialog
+      :open="showDrawModal"
+      @update:open="(val) => !val && (showDrawModal = false)"
+    >
+      <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
+        <!-- HEADER -->
+        <DialogHeader>
+          <DialogTitle>Generar obra a partir de un esbozo</DialogTitle>
+          <DialogDescription>
+            Sube un esbozo desde tu biblioteca o dibujalo en el editor, y añade una descripción para transformar el esbozo en una nueva obra.
+          </DialogDescription>
+        </DialogHeader>
+
+        <!-- LAYOUT DOS COLUMNAS -->
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
+          <!-- COLUMNA IZQUIERDA · PROMPT -->
+          <div class="flex flex-col gap-4">
+            <Tabs v-model="activeDrawTab">
+              <TabsList class="mx-auto mb-3">
+                <TabsTrigger value="upload">
+                  Subir boceto
+                </TabsTrigger>
+                <TabsTrigger value="draw">
+                  Dibujar boceto
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload">
+                <div class="grid gap-2 mb-3">
+              
+                  <!-- Label + Input -->
+                  <Label for="fileInput">
+                    Paso 1: Sube un boceto desde la biblioteca de archivos de tu ordenador:
+                  </Label>
+                                
+                  <div class="flex items-center gap-3">
+                    <!-- Botón seleccionar archivo -->
+                    <div class="relative shrink-0">
+                      <input
+                        id="fileInput"
+                        type="file"
+                        accept="image/*"
+                        @change="onFileChange"
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <Button variant="outline">
+                        <FolderOpen class="h-4 w-4" />
+                        <span>Seleccionar archivo</span>
+                      </Button>
+                    </div>
+
+                    <!-- Nombre del archivo -->
+                    <span class="text-sm text-muted-foreground truncate max-w-xs">
+                      {{ uploadFile ? uploadFile.name : 'Ningún archivo seleccionado' }}
+                    </span>
+                  </div>
+
+                </div>
+
+                <div class="h-px bg-border my-4"/>
+
+            
+                <div class="grid gap-2">
+                  <Label for="promptText">
+                    Paso 2: Describe la obra que quieres crear a partir del boceto subido:
+                  </Label>
+                  <Textarea
+                    id="promptText"
+                    v-model="prompt.promptText"
+                    placeholder="Describe tu boceto en detalle para reconvertirlo en una obra final."
+                    class="min-h-[200px]"
+                    :disabled="modalLoading"
+                  />
+                </div>
+
+                <Button class="mt-3"
+                  @click="uploadAndTransformSketch"
+                  :disabled="isLoadingGallery || !uploadFile || !prompt.promptText.trim()"
+                  variant="default"
+                >
+                  Transformar boceto
+                </Button>
+
+              </TabsContent>
+              <TabsContent value="draw">
+                <div class="grid gap-2">
+                  <Label for="promptText">
+                    Diseña un nuevo boceto en el editor:
+                  </Label>
+                </div>
+                <div class="flex justify-start mt-3">
+                  <Button 
+                    variant="default"
+                    class="px-4 py-2"
+                    @click="drawSketch">
+                    <Brush class="h-4 w-4" />
+                    Ir a dibujar boceto
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <!-- DIVISOR -->
+          <div class="hidden md:flex items-stretch">
+            <div class="w-px bg-border" />
+          </div>
+
+          <!-- COLUMNA DERECHA · PREVISUALIZACIÓN -->
+          <Card class="h-full">
+            <CardContent
+              class="flex flex-col items-center justify-center h-full gap-4 py-6 text-center"
+            >
+              <!-- LOADING -->
+              <div
+                v-if="modalLoading"
+                class="flex flex-col items-center gap-3 text-muted-foreground"
+              >
+                <Loader2 class="h-6 w-6 animate-spin" />
+                <span class="text-sm">Generando imagen...</span>
+              </div>
+
+              <!-- IMAGEN GENERADA -->
+              <div
+                v-else-if="tempImageUrl"
+                class="flex flex-col items-center gap-4 w-full"
+              >
+                <img
+                  :src="tempImageUrl"
+                  alt="Previsualización de la obra"
+                  class="max-h-[360px] rounded-lg border object-contain"
+                />
+
+              </div>
+
+              <!-- ESTADO VACÍO -->
+              <div
+                v-else
+                class="flex flex-col items-center gap-2 text-muted-foreground"
+              >
+                <ImageIcon class="h-8 w-8 opacity-50" />
+                <span class="text-sm">
+                  Aún no hay ninguna imagen generada
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div class="flex justify-center mt-3">
+          <Button
+            :disabled="modalLoading || !tempImageUrl"
+            class="bg-green-600 hover:bg-green-700 text-white px-8 py-5 rounded-lg font-bold text-lg shadow-lg"          
+            @click="modalDrawConfirm"
+          >
+            Confirmar imagen
+        </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
 
     <!-- Drawing Modal -->
     <div v-if="showDrawModal" class="modal-overlay" style="position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:50;">
@@ -650,50 +1099,77 @@ const drawSketch = async () => {
       </div>
     </div>
 
-    <!-- Galería modal -->
-    <div v-if="showGallery" class="gallery-modal">
-      <button class="close-btn" @click="showGallery = false">Cerrar</button>
-      <div style="margin-bottom: 10px;">
-        <button @click="toggleMultiSelectMode">{{ multiSelectMode ? 'Cancelar selección múltiple' : 'Seleccionar varias imágenes' }}</button>
-        <button v-if="multiSelectMode" @click="confirmMultiSelect" :disabled="selectedImages.length < minMultiSelect" style="margin-left:.5rem;">Confirmar selección ({{ selectedImages.length }})</button>
-      </div>
+    <!-- Galería modal en Dialog -->
+    <Dialog
+      :open="showGallery"
+      @update:open="(val) => !val && (showGallery = false)"
+    >
+      <DialogContent class="max-w-5xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{{ showMultiSelectMode ? 'Selecciona imágenes para combinar' : 'Selecciona una imagen' }}</DialogTitle>
+          <DialogDescription>{{ showMultiSelectMode ? 'Selecciona de 2 a 4 imagenes que se mezclaran para crear una nueva obra.' : 'Selecciona una imagen como punto de partida para tu obra.' }}</DialogDescription>
+        </DialogHeader>
 
-      <!-- Templates -->
-      <div v-if="galleryImages.templates?.length">
-        <h3>Templates</h3>
-        <div class="gallery-grid">
-          <div v-for="img in galleryImages.templates" :key="img.id" class="img-item"
-               @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
-               :class="{ 'selected-multi': selectedImages.includes(img) }">
-            <img :src="getImageUrl(img.fileName)" />
+        <div class="flex items-center gap-3 mb-2">
+          <Button
+            v-if="showMultiSelectMode && multiSelectMode"
+            size="sm"
+            :disabled="selectedImages.length < minMultiSelect"
+            @click="confirmMultiSelect"
+          >
+            Confirmar selección ({{ selectedImages.length }})
+          </Button>
+        </div>
+
+        <div class="space-y-4">
+          <div v-if="galleryImages.templates?.length">
+            <h3>Templates</h3>
+            <div class="gallery-grid">
+              <div
+                v-for="img in galleryImages.templates"
+                :key="img.id"
+                class="img-item"
+                @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
+                :class="{ 'selected-multi': selectedImages.includes(img) }"
+              >
+                <img :src="getImageUrl(img.fileName)" />
+              </div>
+            </div>
+          </div>
+
+          <div v-if="galleryImages.generated?.length">
+            <h3>Generadas</h3>
+            <div class="gallery-grid">
+              <div
+                v-for="img in galleryImages.generated"
+                :key="img.id"
+                class="img-item"
+                @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
+                :class="{ 'selected-multi': selectedImages.includes(img) }"
+              >
+                <img :src="getImageUrl(img.fileName)" />
+              </div>
+            </div>
+          </div>
+
+          <div v-if="galleryImages.uploaded?.length">
+            <h3>Subidas</h3>
+            <div class="gallery-grid">
+              <div
+                v-for="img in galleryImages.uploaded"
+                :key="img.id"
+                class="img-item"
+                @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
+                :class="{ 'selected-multi': selectedImages.includes(img) }"
+              >
+                <img :src="getImageUrl(img.fileName)" />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- Generated -->
-      <div v-if="galleryImages.generated?.length" style="margin-top: 1rem;">
-        <h3>Generadas</h3>
-        <div class="gallery-grid">
-          <div v-for="img in galleryImages.generated" :key="img.id" class="img-item"
-               @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
-               :class="{ 'selected-multi': selectedImages.includes(img) }">
-            <img :src="getImageUrl(img.fileName)" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Uploaded -->
-      <div v-if="galleryImages.uploaded?.length" style="margin-top: 1rem;">
-        <h3>Subidas</h3>
-        <div class="gallery-grid">
-          <div v-for="img in galleryImages.uploaded" :key="img.id" class="img-item"
-               @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
-               :class="{ 'selected-multi': selectedImages.includes(img) }">
-            <img :src="getImageUrl(img.fileName)" />
-          </div>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
+    
     <div class="chat-container" style="margin-top:1rem;">
       <div class="chat-messages" style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:0.5rem; margin-bottom:0.5rem;">
         <div v-for="(msg, i) in chatMessages" :key="i" :style="{ textAlign: msg.sender === role ? 'right' : 'left' }">
@@ -723,25 +1199,23 @@ const drawSketch = async () => {
   z-index: 999; font-size: 1.5em;
 }
 
-.gallery-modal {
-  color: #000; /* negro */
-  text-align: left;
-  position: fixed;
-  top: 10%; left: 10%;
-  width: 80%; height: 80%;
-  background: white; border-radius: 8px;
-  overflow: auto; padding: 20px; z-index: 1000;
-}
-
-.close-btn { float: right; padding: 5px 10px; cursor: pointer; }
-
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 10px; margin-top: 20px;
 }
 
-.img-item img { width: 100%; border-radius: 6px; cursor: pointer; }
+.img-item img { 
+  width: 100%; 
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 6px; 
+  cursor: pointer; 
+}
+
+.img-item {
+  cursor: pointer;
+}
 
 .selected-multi {
   border: 3px solid #3b82f6; /* azul, por ejemplo */

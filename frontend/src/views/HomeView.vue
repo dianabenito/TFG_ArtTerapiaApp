@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { userService } from '../api/userService'
@@ -166,7 +166,7 @@ const ensureUTCString = (dateString) => {
         <!-- NO HAY SESIÓN - PACIENTE -->
         <Button
           v-else-if="user?.type === 'patient'"
-          class="w-full bg-cyan-600 text-white hover:bg-cyan-700 shadow-sm hover:shadow-md border border-cyan-700"
+          class="w-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow-md"
         >
           Ir a la generación libre
         </Button>
