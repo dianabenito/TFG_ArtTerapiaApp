@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import ChatPanel from '@/components/ChatPanel.vue'
 import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService.js'
 import { sessionsService } from '../api/sessionsService.js'
@@ -23,6 +24,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import GalleryDialog from '@/components/GalleryDialog.vue'
+import RefineModal from '@/components/RefineModal.vue'
+import ImagesModal from '@/components/ImagesModal.vue'
+import DrawModal from '@/components/DrawModal.vue'
 import { FolderOpen, Brush, Send, PenTool, ImageIcon, Layers, Loader2, Info, HelpCircle, PanelRightClose, MessageCircle } from 'lucide-vue-next'
 
 const API_URL = 'http://127.0.0.1:8000'
@@ -67,6 +72,10 @@ const maxMultiSelect = 4
 
 const showGallery = ref(false)
 const chatOpen = ref(false)
+const showFinalView = ref(false)
+
+const stateStorageKey = sessionId ? `gen_state_${sessionId}` : 'gen_state_default'
+const instructionsSeenKey = sessionId ? `gen_instr_${sessionId}` : 'gen_instr_default'
 
 
 // Tab control for draw modal
@@ -109,6 +118,7 @@ const connectWs = () => {
       const obj = JSON.parse(ev.data)
       if (obj.event === 'chat_message') {
         chatMessages.value.push({ sender: obj.sender, text: obj.text })
+        persistState()
         return
       }
     } catch (e) {
@@ -117,6 +127,7 @@ const connectWs = () => {
       if (txt === 'session_ended') {
         // actualizar estado local
         sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
+        clearPersistedState()
         ws?.close()
         // redirigir al paciente a Home
         try {
@@ -133,7 +144,49 @@ const connectWs = () => {
   ws.onclose = () => console.log('WS cerrado')
 }
 
+const clearPersistedState = () => {
+  try {
+    localStorage.removeItem(stateStorageKey)
+    localStorage.removeItem(instructionsSeenKey)
+  } catch (e) {
+    console.warn('No se pudo limpiar el estado local:', e)
+  }
+}
+
+const persistState = () => {
+  try {
+    const payload = {
+      imageUrl: imageUrl.value,
+      showFinalView: showFinalView.value,
+      chatMessages: chatMessages.value,
+    }
+    localStorage.setItem(stateStorageKey, JSON.stringify(payload))
+  } catch (e) {
+    console.warn('No se pudo guardar el estado local:', e)
+  }
+}
+
+const restoreState = () => {
+  try {
+    const raw = localStorage.getItem(stateStorageKey)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (saved?.imageUrl) imageUrl.value = saved.imageUrl
+    if (typeof saved?.showFinalView === 'boolean') {
+      showFinalView.value = saved.showFinalView
+      chatOpen.value = saved.showFinalView || chatOpen.value
+    }
+    if (Array.isArray(saved?.chatMessages)) {
+      chatMessages.value = saved.chatMessages
+    }
+  } catch (e) {
+    console.warn('No se pudo restaurar el estado local:', e)
+  }
+}
+
 onMounted(async () => {
+  restoreState()
+
   // obtener info de sesión
   if (Number.isFinite(sessionId)) {
     try {
@@ -142,6 +195,7 @@ onMounted(async () => {
       if (sessionInfo.value?.ended_at) {
         try {
           alert('La sesión ha finalizado.')
+          clearPersistedState()
           router.push('/home')
           return
         } catch (e) {
@@ -188,8 +242,19 @@ onMounted(async () => {
     // Remove 'image' query param to avoid loop
     router.replace({ query: {} })
   }
-  showInstructions.value = true
+
+  // mostrar instrucciones solo la primera vez en esta sesión
+  const alreadySeenInstructions = localStorage.getItem(instructionsSeenKey)
+  if (!alreadySeenInstructions) {
+    showInstructions.value = true
+    localStorage.setItem(instructionsSeenKey, '1')
+  }
 })
+
+// persist local state when key pieces change
+watch(imageUrl, persistState)
+watch(showFinalView, persistState)
+watch(chatMessages, persistState, { deep: true })
 
 onBeforeUnmount(() => ws?.close())
 
@@ -199,6 +264,13 @@ const sendChatMessage = () => {
   ws.send(JSON.stringify(msg))
   chatMessages.value.push(msg)  // reflejar mensaje localmente
   newChatMessage.value = ''
+  persistState()
+}
+
+const sendChatFromChild = (text: string) => {
+  if (!text) return
+  newChatMessage.value = text
+  sendChatMessage()
 }
 
 const generateImage = async (last_seed = null, inputImage = null) => {
@@ -282,6 +354,7 @@ const createFromSketch = async(inputImage) => {
 
 // Open refine modal: generate initial image and allow regenerations with same seed
 const openRefineModal = async () => {
+  prompt.value.promptText = ''
   chatOpen.value = false
   tempImageUrl.value = ''
   showRefineModal.value = true
@@ -325,6 +398,7 @@ const modalTextConfirm = () => {
   }
   showRefineModal.value = false
   submitImage()
+  persistState()
 }
 
 const modalImagesConfirm = () => {
@@ -335,6 +409,7 @@ const modalImagesConfirm = () => {
   }
   showImagesModal.value = false
   submitImage()
+  persistState()
 }
 
 const modalDrawConfirm = () => {
@@ -345,10 +420,17 @@ const modalDrawConfirm = () => {
   }
   showDrawModal.value = false
   submitImage()
+  persistState()
 }
 
-const onFileChange = (ev) => {
-  const f = ev.target.files && ev.target.files[0]
+const onFileChange = (arg: any) => {
+  let f: File | null = null
+  if (arg && typeof arg === 'object' && 'target' in arg) {
+    const ev = arg as Event & { target: HTMLInputElement }
+    f = ev.target?.files?.[0] || null
+  } else {
+    f = arg as File
+  }
   if (f) uploadFile.value = f
 }
 
@@ -410,6 +492,7 @@ const uploadAndTransformSketch = async () => {
 }
 
 const openSelectImagesModal = async () => {
+  prompt.value.promptText = ''
   chatOpen.value = false
   tempImageUrl.value = imageUrl.value
   showImagesModal.value = true
@@ -417,6 +500,7 @@ const openSelectImagesModal = async () => {
 }
 
 const openDrawModal = async () => {
+  prompt.value.promptText = ''
   chatOpen.value = false
   tempImageUrl.value = ''
   showDrawModal.value = true
@@ -442,6 +526,13 @@ const submitImage = () => {
   } catch (e) {
     console.warn('No se pudo mostrar toast tras enviar la imagen:', e)
   }
+}
+
+const confirmFinalArtwork = () => {
+  submitImage()
+  showFinalView.value = true
+  chatOpen.value = true
+  persistState()
 }
 
 const loadGallery = async () => {
@@ -593,6 +684,7 @@ const confirmMultiSelect = async () => {
   } finally {
     modalLoading.value = false
     submitImage()
+    persistState()
   }
 }
 
@@ -721,6 +813,7 @@ const formatLocalDate = (utcString) => {
 
     <!-- CONTENIDO PRINCIPAL -->
     <div
+      v-if="!showFinalView"
       class="transition-all duration-300 bg-muted/30"
       :class="chatOpen ? 'mr-80' : 'mr-0'"
     >
@@ -778,13 +871,13 @@ const formatLocalDate = (utcString) => {
           class="transition-all duration-300"
           :class="imageUrl ? 'min-h-[420px]' : 'min-h-[220px]'"
         >
-          <CardContent class="flex items-center justify-center h-full p-6">
+          <CardContent class="flex items-center justify-center h-full p-2">
             <div v-if="imageUrl" class="flex flex-col items-center gap-4">
               <img
                 :src="imageUrl"
                 class="max-h-[360px] rounded-xl border shadow-md object-contain"
               />
-              <span class="text-sm text-muted-foreground">
+              <span class="text-sm text-muted-foreground mt-2 block">
                 Esta es tu obra actual. Puedes modificarla o crear una nueva usando las opciones a continuación, o confirmarla cuando estés satisfecho.
               </span>
             </div>
@@ -860,633 +953,190 @@ const formatLocalDate = (utcString) => {
           <Button
             size="lg"
             class="bg-green-600 hover:bg-green-700 text-white px-10 py-5 text-lg font-bold rounded-full shadow-lg shadow-green-600/30"
-            @click="submitImage"
+            @click="confirmFinalArtwork"
             :disabled="!imageUrl"
           >
-            Enviar al terapeuta
+            Confirmar la obra creada
           </Button>
         </div>
 
       </div>
     </div>
 
+    <!-- VISTA FINAL · IMAGEN + CHAT -->
+    <div v-else class="bg-muted/30 min-h-[calc(100vh-4rem)]">
+      <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
+          <Card class="h-full">
+            <CardHeader>
+              <CardTitle>Obra final enviada</CardTitle>
+              <CardDescription>Imagen confirmada para la sesión.</CardDescription>
+            </CardHeader>
+            <CardContent class="flex items-center justify-center">
+              <div v-if="imageUrl" class="w-full">
+                <img
+                  :src="imageUrl"
+                  class="w-full max-h-[70vh] rounded-xl border shadow-md object-contain bg-white"
+                />
+              </div>
+              <div v-else class="text-center text-muted-foreground space-y-2">
+                <ImageIcon class="h-12 w-12 mx-auto opacity-50" />
+                <p class="text-sm">No hay imagen final disponible.</p>
+              </div>
+            </CardContent>
+          </Card>
 
-    <Dialog
+          <ChatPanel
+            :messages="chatMessages"
+            :role="role"
+            :activeUser="active_user"
+            :therapistUser="therapistUser"
+            @send="(text) => sendChatFromChild(text)"
+          />
+        </div>
+      </div>
+    </div>
+
+
+    <RefineModal
       :open="showRefineModal"
+      :loading="modalLoading"
+      :tempImageUrl="tempImageUrl"
+      v-model:promptText="prompt.promptText"
       @update:open="(val) => !val && (showRefineModal = false)"
-    >
-      <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
-        <!-- HEADER -->
-        <DialogHeader>
-          <DialogTitle>Generar obra a partir de un prompt de texto</DialogTitle>
-          <DialogDescription>
-            Describe la obra que quieres crear y genera una imagen basada en tu descripción.
-          </DialogDescription>
-        </DialogHeader>
+      @generate="modalRegenerate"
+      @confirm="modalTextConfirm"
+    />
 
-        <!-- LAYOUT DOS COLUMNAS -->
-        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
-          <!-- COLUMNA IZQUIERDA · PROMPT -->
-          <div class="flex flex-col gap-4">
-            <div class="grid gap-2">
-              <Label for="promptText">
-                Descripción de la obra
-              </Label>
-              <Textarea
-                id="promptText"
-                v-model="prompt.promptText"
-                placeholder="Describe el contenido que quieres ver en tu obra."
-                class="min-h-[200px]"
-                :disabled="modalLoading"
-              />
-            </div>
-
-            <div class="flex justify-end">
-              <Button 
-                variant="default"
-                class="px-4 py-2"
-                @click="modalRegenerate"
-                :disabled="modalLoading || !prompt.promptText.trim()"
-              >
-                Generar imagen
-              </Button>
-            </div>
-          </div>
-
-          <!-- DIVISOR -->
-          <div class="hidden md:flex items-stretch">
-            <div class="w-px bg-border" />
-          </div>
-
-          <!-- COLUMNA DERECHA · PREVISUALIZACIÓN -->
-          <Card class="h-full">
-            <CardContent
-              class="flex flex-col items-center justify-center h-full gap-4 py-6 text-center"
-            >
-              <!-- LOADING -->
-              <div
-                v-if="modalLoading"
-                class="flex flex-col items-center gap-3 text-muted-foreground"
-              >
-                <Loader2 class="h-6 w-6 animate-spin" />
-                <span class="text-sm">Generando imagen...</span>
-              </div>
-
-              <!-- IMAGEN GENERADA -->
-              <div
-                v-else-if="tempImageUrl"
-                class="flex flex-col items-center gap-4 w-full"
-              >
-                <img
-                  :src="tempImageUrl"
-                  alt="Previsualización de la obra"
-                  class="max-h-[360px] rounded-lg border object-contain"
-                />
-
-              </div>
-
-              <!-- ESTADO VACÍO -->
-              <div
-                v-else
-                class="flex flex-col items-center gap-2 text-muted-foreground"
-              >
-                <ImageIcon class="h-8 w-8 opacity-50" />
-                <span class="text-sm">
-                  Aún no hay ninguna imagen generada
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div class="flex justify-center mt-3">
-          <Button 
-              :disabled="modalLoading || !tempImageUrl"
-            class="bg-green-600 hover:bg-green-700 text-white px-8 py-5 rounded-lg font-bold text-lg shadow-lg"          
-            @click="modalTextConfirm"
-          >
-            Confirmar imagen
-        </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-    <Dialog
+    <ImagesModal
       :open="showImagesModal"
+      :loading="modalLoading"
+      :tempImageUrl="tempImageUrl"
+      :isLoadingGallery="isLoadingGallery"
+      :uploadFileName="uploadFile ? uploadFile.name : null"
+      v-model:promptText="prompt.promptText"
       @update:open="(val) => !val && (showImagesModal = false)"
-    >
-      <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
-        <!-- HEADER -->
-        <DialogHeader>
-          <DialogTitle>Generar obra a partir de una imagen de entrada y un prompt de texto</DialogTitle>
-          <DialogDescription>
-            Sube una imagen desde tu biblioteca o selecciona una imagen existente de la galería, y añade una descripción para transformar la imagen en una nueva obra.
-          </DialogDescription>
-        </DialogHeader>
+      @fileChange="onFileChange"
+      @uploadImage="uploadUserImage"
+      @openGallery="openGalleryModal"
+      @convert="() => generateImage(null, tempImageUrl)"
+      @confirm="modalImagesConfirm"
+    />
 
-        <!-- LAYOUT DOS COLUMNAS -->
-        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
-          <!-- COLUMNA IZQUIERDA · PROMPT -->
-          <div class="flex flex-col gap-4">
-            <Tabs default-value="upload">
-              <TabsList class="mx-auto mb-3">
-                <TabsTrigger value="upload">
-                  Subir imagen
-                </TabsTrigger>
-                <TabsTrigger value="gallery">
-                  Escoger de la galería
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="upload">
-                <div class="grid gap-2 mb-3">
-              
-                  <!-- Label + Input -->
-                  <Label for="fileInput">
-                    Paso 1: Sube una imagen de la biblioteca de archivos de tu ordenador:
-                  </Label>
-                                
-                  <div class="flex items-center gap-3">
-                    <!-- Botón seleccionar archivo -->
-                    <div class="relative shrink-0">
-                      <input
-                        id="fileInput"
-                        type="file"
-                        accept="image/*"
-                        @change="onFileChange"
-                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <Button variant="outline">
-                        <FolderOpen class="h-4 w-4" />
-                        <span>Seleccionar archivo</span>
-                      </Button>
-                    </div>
-
-                    <!-- Nombre del archivo -->
-                    <span class="text-sm text-muted-foreground truncate max-w-xs">
-                      {{ uploadFile ? uploadFile.name : 'Ningún archivo seleccionado' }}
-                    </span>
-                  </div>
-
-                </div>
-
-                <Button
-                  @click="uploadUserImage"
-                  :disabled="isLoadingGallery || !uploadFile"
-                  variant="default"
-                >
-                  Subir imagen
-                </Button>
-
-
-                <div class="h-px bg-border my-4" v-if="tempImageUrl"/>
-
-            
-                <div class="grid gap-2" v-if="tempImageUrl">
-                  <Label for="promptText">
-                    Paso 2: Describe la obra que quieres crear a partir de la imagen subida:
-                  </Label>
-                  <Textarea
-                    id="promptText"
-                    v-model="prompt.promptText"
-                    placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida."
-                    class="min-h-[200px]"
-                    :disabled="modalLoading"
-                  />
-                </div>
-
-                <div class="flex justify-start mt-3">
-                  <Button 
-                    v-if="tempImageUrl"
-                    variant="default"
-                    class="px-4 py-2"
-                    @click="generateImage(null, tempImageUrl)"
-                    :disabled="modalLoading || !prompt.promptText.trim()"
-                  >
-                    Convertir la imagen con texto
-                  </Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="gallery">
-                <div class="grid gap-2">
-                  <!-- Label + Input -->
-                  <Label>
-                    Paso 1: Escoge una imagen de la galería de imágenes:
-                  </Label>
-                  <Button 
-                    variant="default"
-                    class="px-4 py-2 w-fit mt-1"
-                    @click="openGalleryModal"
-                    :disabled="isLoadingGallery"
-                  >
-                    Ver galería
-                  </Button>
-                </div>
-
-                <div class="h-px bg-border my-4" v-if="tempImageUrl"/>
-            
-                <div class="grid gap-2" v-if="tempImageUrl">
-                  <Label for="promptText" class="leading-normal">
-                    Paso 2: Describe la obra que quieres crear a partir de la imagen seleccionada:
-                  </Label>
-                  <Textarea
-                    id="promptText"
-                    v-model="prompt.promptText"
-                    placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida."
-                    class="min-h-[200px]"
-                    :disabled="modalLoading"
-                  />
-                </div>
-
-                <div class="flex justify-start mt-3">
-                  <Button 
-                    v-if="tempImageUrl"
-                    variant="default"
-                    class="px-4 py-2"
-                    @click="generateImage(null, tempImageUrl)"
-                    :disabled="modalLoading || !prompt.promptText.trim()"
-                  >
-                    Convertir la imagen con texto
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <!-- DIVISOR -->
-          <div class="hidden md:flex items-stretch">
-            <div class="w-px bg-border" />
-          </div>
-
-          <!-- COLUMNA DERECHA · PREVISUALIZACIÓN -->
-          <Card class="h-full">
-            <CardContent
-              class="flex flex-col items-center justify-center h-full gap-4 py-6 text-center"
-            >
-              <!-- LOADING -->
-              <div
-                v-if="modalLoading"
-                class="flex flex-col items-center gap-3 text-muted-foreground"
-              >
-                <Loader2 class="h-6 w-6 animate-spin" />
-                <span class="text-sm">Generando imagen...</span>
-              </div>
-
-              <!-- IMAGEN GENERADA -->
-              <div
-                v-else-if="tempImageUrl"
-                class="flex flex-col items-center gap-4 w-full"
-              >
-                <img
-                  :src="tempImageUrl"
-                  alt="Previsualización de la obra"
-                  class="max-h-[360px] rounded-lg border object-contain"
-                />
-
-              </div>
-
-              <!-- ESTADO VACÍO -->
-              <div
-                v-else
-                class="flex flex-col items-center gap-2 text-muted-foreground"
-              >
-                <ImageIcon class="h-8 w-8 opacity-50" />
-                <span class="text-sm">
-                  Aún no hay ninguna imagen generada
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div class="flex justify-center mt-3">
-          <Button
-            :disabled="modalLoading || !tempImageUrl"
-            class="bg-green-600 hover:bg-green-700 text-white px-8 py-5 rounded-lg font-bold text-lg shadow-lg"          
-            @click="modalImagesConfirm"
-          >
-            Confirmar imagen
-        </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-    <Dialog
+    <DrawModal
       :open="showDrawModal"
+      :loading="modalLoading"
+      :tempImageUrl="tempImageUrl"
+      :activeTab="activeDrawTab"
+      :isLoadingGallery="isLoadingGallery"
+      :uploadFileName="uploadFile ? uploadFile.name : null"
+      v-model:promptText="prompt.promptText"
       @update:open="(val) => !val && (showDrawModal = false)"
-    >
-      <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
-        <!-- HEADER -->
-        <DialogHeader>
-          <DialogTitle>Generar obra a partir de un esbozo</DialogTitle>
-          <DialogDescription>
-            Sube un esbozo desde tu biblioteca o dibujalo en el editor, y añade una descripción para transformar el esbozo en una nueva obra.
-          </DialogDescription>
-        </DialogHeader>
-
-        <!-- LAYOUT DOS COLUMNAS -->
-        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
-          <!-- COLUMNA IZQUIERDA · PROMPT -->
-          <div class="flex flex-col gap-4">
-            <Tabs v-model="activeDrawTab">
-              <TabsList class="mx-auto mb-3">
-                <TabsTrigger value="upload">
-                  Subir boceto
-                </TabsTrigger>
-                <TabsTrigger value="draw">
-                  Dibujar boceto
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="upload">
-                <div class="grid gap-2 mb-3">
-              
-                  <!-- Label + Input -->
-                  <Label for="fileInput">
-                    Paso 1: Sube un boceto desde la biblioteca de archivos de tu ordenador:
-                  </Label>
-                                
-                  <div class="flex items-center gap-3">
-                    <!-- Botón seleccionar archivo -->
-                    <div class="relative shrink-0">
-                      <input
-                        id="fileInput"
-                        type="file"
-                        accept="image/*"
-                        @change="onFileChange"
-                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <Button variant="outline">
-                        <FolderOpen class="h-4 w-4" />
-                        <span>Seleccionar archivo</span>
-                      </Button>
-                    </div>
-
-                    <!-- Nombre del archivo -->
-                    <span class="text-sm text-muted-foreground truncate max-w-xs">
-                      {{ uploadFile ? uploadFile.name : 'Ningún archivo seleccionado' }}
-                    </span>
-                  </div>
-
-                </div>
-
-                <div class="h-px bg-border my-4"/>
-
-            
-                <div class="grid gap-2">
-                  <Label for="promptText">
-                    Paso 2: Describe la obra que quieres crear a partir del boceto subido:
-                  </Label>
-                  <Textarea
-                    id="promptText"
-                    v-model="prompt.promptText"
-                    placeholder="Describe tu boceto en detalle para reconvertirlo en una obra final."
-                    class="min-h-[200px]"
-                    :disabled="modalLoading"
-                  />
-                </div>
-
-                <Button class="mt-3"
-                  @click="uploadAndTransformSketch"
-                  :disabled="isLoadingGallery || !uploadFile || !prompt.promptText.trim()"
-                  variant="default"
-                >
-                  Transformar boceto
-                </Button>
-
-              </TabsContent>
-              <TabsContent value="draw">
-                <div class="grid gap-2">
-                  <Label for="promptText">
-                    Diseña un nuevo boceto en el editor:
-                  </Label>
-                </div>
-                <div class="flex justify-start mt-3">
-                  <Button 
-                    variant="default"
-                    class="px-4 py-2"
-                    @click="drawSketch">
-                    <Brush class="h-4 w-4" />
-                    Ir a dibujar boceto
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <!-- DIVISOR -->
-          <div class="hidden md:flex items-stretch">
-            <div class="w-px bg-border" />
-          </div>
-
-          <!-- COLUMNA DERECHA · PREVISUALIZACIÓN -->
-          <Card class="h-full">
-            <CardContent
-              class="flex flex-col items-center justify-center h-full gap-4 py-6 text-center"
-            >
-              <!-- LOADING -->
-              <div
-                v-if="modalLoading"
-                class="flex flex-col items-center gap-3 text-muted-foreground"
-              >
-                <Loader2 class="h-6 w-6 animate-spin" />
-                <span class="text-sm">Generando imagen...</span>
-              </div>
-
-              <!-- IMAGEN GENERADA -->
-              <div
-                v-else-if="tempImageUrl"
-                class="flex flex-col items-center gap-4 w-full"
-              >
-                <img
-                  :src="tempImageUrl"
-                  alt="Previsualización de la obra"
-                  class="max-h-[360px] rounded-lg border object-contain"
-                />
-
-              </div>
-
-              <!-- ESTADO VACÍO -->
-              <div
-                v-else
-                class="flex flex-col items-center gap-2 text-muted-foreground"
-              >
-                <ImageIcon class="h-8 w-8 opacity-50" />
-                <span class="text-sm">
-                  Aún no hay ninguna imagen generada
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div class="flex justify-center mt-3">
-          <Button
-            :disabled="modalLoading || !tempImageUrl"
-            class="bg-green-600 hover:bg-green-700 text-white px-8 py-5 rounded-lg font-bold text-lg shadow-lg"          
-            @click="modalDrawConfirm"
-          >
-            Confirmar imagen
-        </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      @update:activeTab="(v) => (activeDrawTab = v)"
+      @fileChange="onFileChange"
+      @uploadAndTransform="uploadAndTransformSketch"
+      @drawSketch="drawSketch"
+      @confirm="modalDrawConfirm"
+    />
 
   
     <!-- Galería modal en Dialog -->
-    <Dialog
+    <GalleryDialog
       :open="showGallery"
-      @update:open="(val) => !val && (showGallery = false)"
-    >
-      <DialogContent class="max-w-5xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{{ showMultiSelectMode ? 'Selecciona imágenes para combinar' : 'Selecciona una imagen' }}</DialogTitle>
-          <DialogDescription>{{ showMultiSelectMode ? 'Selecciona de 2 a 4 imagenes que se mezclaran para crear una nueva obra.' : 'Selecciona una imagen como punto de partida para tu obra.' }}</DialogDescription>
-        </DialogHeader>
-
-        <div class="flex items-center gap-3 mb-2">
-          <Button
-            v-if="showMultiSelectMode && multiSelectMode"
-            size="sm"
-            :disabled="selectedImages.length < minMultiSelect"
-            @click="confirmMultiSelect"
-          >
-            Confirmar selección ({{ selectedImages.length }})
-          </Button>
-        </div>
-
-        <div class="space-y-4">
-          <div v-if="galleryImages.templates?.length">
-            <h3>Templates</h3>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-[10px] mt-5">
-              <div
-                v-for="img in galleryImages.templates"
-                :key="img.id"
-                class="img-item"
-                @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
-                :class="{ 'selected-multi': selectedImages.includes(img) }"
-              >
-                <img
-                  :src="getImageUrl(img.fileName)"
-                  class="w-full aspect-square object-cover rounded-lg border"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div v-if="galleryImages.generated?.length">
-            <h3>Generadas</h3>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-[10px] mt-5">
-              <div
-                v-for="img in galleryImages.generated"
-                :key="img.id"
-                class="img-item"
-                @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
-                :class="{ 'selected-multi': selectedImages.includes(img) }"
-              >
-                <img
-                  :src="getImageUrl(img.fileName)"
-                  class="w-full aspect-square object-cover rounded-lg border"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div v-if="galleryImages.uploaded?.length">
-            <h3>Subidas</h3>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-[10px] mt-5">
-              <div
-                v-for="img in galleryImages.uploaded"
-                :key="img.id"
-                class="img-item"
-                @click="multiSelectMode ? toggleImageSelection(img) : selectImage(img)"
-                :class="{ 'selected-multi': selectedImages.includes(img) }"
-              >
-                <img
-                  :src="getImageUrl(img.fileName)"
-                  class="w-full aspect-square object-cover rounded-lg border"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      :templates="galleryImages.templates"
+      :generated="galleryImages.generated"
+      :uploaded="galleryImages.uploaded"
+      :multiSelectMode="!!(showMultiSelectMode && multiSelectMode)"
+      :selectedImages="selectedImages"
+      :minMultiSelect="minMultiSelect"
+      :getImageUrl="getImageUrl"
+      @update:open="(v) => !v && (showGallery = false)"
+      @toggle="toggleImageSelection"
+      @confirm="confirmMultiSelect"
+      @selectSingle="selectImage"
+    />
   
 
-    <!-- BOTÓN PARA ABRIR/CERRAR CHAT -->
-    <div 
-      class="fixed z-[60] transition-all duration-300"
-      :class="chatOpen ? 'bottom-6 right-[21rem]' : 'bottom-6 right-6'"
-    >
-      <Button v-if="chatOpen === false"
-        class="rounded-full w-16 h-16 flex items-center justify-center p-4 shadow-lg"
-        @click="chatOpen = true"
+    <template v-if="!showFinalView">
+      <!-- BOTÓN PARA ABRIR/CERRAR CHAT -->
+      <div 
+        class="fixed z-[60] transition-all duration-300"
+        :class="chatOpen ? 'bottom-6 right-[21rem]' : 'bottom-6 right-6'"
       >
-      <MessageCircle class="h-8 w-8" />
-      </Button>
-    </div>
-
-    <div
-      v-show="chatOpen"
-      class="fixed right-0 z-[60] w-80 flex flex-col border-l shadow-lg transition-all duration-300"
-      style="top: 4rem; height: calc(100% - 4rem); background-color: rgb(245, 250, 255);"
-    >
-      <!-- HEADER -->
-      <div class="flex items-center justify-between px-4 py-3 border-b" style="background-color: rgba(96, 165, 250, 0.4);">
-        <div class="flex items-center gap-2">
-          <h2 class="text-sm font-semibold text-black">
-            Chat con el terapeuta
-          </h2>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          class="text-black hover:bg-blue-100"
-          @click="chatOpen = false"
-          aria-label="Cerrar chat"
+        <Button v-if="chatOpen === false"
+          class="rounded-full w-16 h-16 flex items-center justify-center p-4 shadow-lg"
+          @click="chatOpen = true"
         >
-          <PanelRightClose class="h-4 w-4" />
+        <MessageCircle class="h-8 w-8" />
         </Button>
       </div>
 
-      <!-- MENSAJES -->
-      <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-        <div
-          v-for="(msg, i) in chatMessages"
-          :key="i"
-          :class="[
-            'max-w-[75%] px-3 py-2 rounded-xl text-sm shadow-sm break-words',
-            msg.sender === role
-              ? 'ml-auto bg-green-100 text-green-900 rounded-tr-sm'
-              : 'mr-auto bg-gray-100 text-gray-900 rounded-tl-sm'
-          ]"
-        >
-          <div class="text-xs font-semibold opacity-80 mb-0.5">
-            {{ msg.sender === "patient" ? active_user.full_name: therapistUser.full_name }}
+      <div
+        v-show="chatOpen"
+        class="fixed right-0 z-[60] w-80 flex flex-col border-l shadow-lg transition-all duration-300"
+        style="top: 4rem; height: calc(100% - 4rem); background-color: rgb(245, 250, 255);"
+      >
+        <!-- HEADER -->
+        <div class="flex items-center justify-between px-4 py-3 border-b" style="background-color: rgba(96, 165, 250, 0.4);">
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-black">
+              Chat con el terapeuta
+            </h2>
           </div>
-          <div>
-            {{ msg.text }}
-          </div>
-        </div>
-      </div>
 
-      <!-- FOOTER -->
-      <div class="p-3 border-t" style="background-color: rgba(96, 165, 250, 0.3);">
-        <div class="flex gap-2">
-          <Input
-            v-model="newChatMessage"
-            placeholder="Escribe un mensaje…"
-            @keyup.enter="sendChatMessage"
-            class="flex-1 bg-white text-gray-900"
-          />
           <Button
+            variant="ghost"
             size="icon"
-            class="bg-blue-600 text-white hover:bg-blue-500"
-            @click="sendChatMessage"
-            aria-label="Enviar mensaje"
+            class="text-black hover:bg-blue-100"
+            @click="chatOpen = false"
+            aria-label="Cerrar chat"
           >
-            <Send class="h-4 w-4" />
+            <PanelRightClose class="h-4 w-4" />
           </Button>
         </div>
+
+        <!-- MENSAJES -->
+        <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          <div
+            v-for="(msg, i) in chatMessages"
+            :key="i"
+            :class="[
+              'max-w-[75%] px-3 py-2 rounded-xl text-sm shadow-sm break-words',
+              msg.sender === role
+                ? 'ml-auto bg-green-100 text-green-900 rounded-tr-sm'
+                : 'mr-auto bg-gray-100 text-gray-900 rounded-tl-sm'
+            ]"
+          >
+            <div class="text-xs font-semibold opacity-80 mb-0.5">
+              {{ msg.sender === "patient" ? (active_user?.full_name ?? 'Tú') : (therapistUser?.full_name ?? 'Terapeuta') }}
+            </div>
+            <div>
+              {{ msg.text }}
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="p-3 border-t" style="background-color: rgba(96, 165, 250, 0.3);">
+          <div class="flex gap-2">
+            <Input
+              v-model="newChatMessage"
+              placeholder="Escribe un mensaje…"
+              @keyup.enter="sendChatMessage"
+              class="flex-1 bg-white text-gray-900"
+            />
+            <Button
+              size="icon"
+              class="bg-blue-600 text-white hover:bg-blue-500"
+              @click="sendChatMessage"
+              aria-label="Enviar mensaje"
+            >
+              <Send class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
-    </div>
+    </template>
 
 
   </div>
