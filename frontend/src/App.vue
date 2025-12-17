@@ -27,7 +27,7 @@ const route = useRoute()
 const authPaths = ['/', '/signup']
 const showHeader = computed(() => !authPaths.includes(route.path))
 
-document.title = 'App ArtTerapia'
+document.title = 'ArteTerapia App'
 </script>
 
 <style>

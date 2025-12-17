@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Calendar, Home } from 'lucide-vue-next'
 import {
   Sidebar,
@@ -22,6 +23,8 @@ import ProfileDropdown from './ProfileDropdown.vue'
 import { useRoute } from 'vue-router'
 const route = useRoute()
 
+import mainBg from '@/assets/utils/fondo_app.jpg'
+
 const items = [
   {
     title: 'Inicio',
@@ -34,15 +37,23 @@ const items = [
     icon: Calendar,
   },
 ]
+
+const bgStyle = computed(() => ({
+  backgroundImage: `url(${mainBg})`,
+  backgroundSize: 'cover',
+  backgroundPosition: 'top center',
+}))
+
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-gradient-to-b from-gray-300 via-gray-200 to-gray-100 text-gray-800">
+  <div class="min-h-screen flex flex-col text-gray-800"
+  :style="bgStyle">
     <SidebarProvider class="flex flex-1">
       <Sidebar>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>ArtTeràpia App</SidebarGroupLabel>
+            <SidebarGroupLabel>ArteTerapia App</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem v-for="item in items" :key="item.title">

@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-6xl mx-auto p-4 h-[calc(100vh-4rem)] space-y-4">
+  <div class="max-w-6xl mx-auto p-4 min-h-[calc(100vh-4rem)] space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="space-y-1">
         <h1 class="text-2xl font-semibold text-slate-900">Calendario</h1>
