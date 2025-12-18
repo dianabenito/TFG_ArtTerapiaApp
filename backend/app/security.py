@@ -9,7 +9,7 @@ _log = logging.getLogger(__name__)
 
 SECRET_KEY = "supersecretkey123456"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
 
 def _prehash_bytes(password: str) -> bytes:

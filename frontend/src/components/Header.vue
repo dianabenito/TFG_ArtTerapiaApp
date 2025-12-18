@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Calendar, Home } from 'lucide-vue-next'
 import {
   Sidebar,
@@ -22,6 +23,8 @@ import ProfileDropdown from './ProfileDropdown.vue'
 import { useRoute } from 'vue-router'
 const route = useRoute()
 
+import mainBg from '@/assets/utils/fondo_app.jpg'
+
 const items = [
   {
     title: 'Inicio',
@@ -34,15 +37,35 @@ const items = [
     icon: Calendar,
   },
 ]
+
+const bgStyle = computed(() => ({
+  backgroundImage: `url(${mainBg})`,
+  backgroundSize: 'cover',
+  backgroundPosition: 'top center',
+}))
+
+
+const headerStyle = computed(() => ({
+  backgroundImage: `
+    linear-gradient(
+      rgba(255,255,255,0.2),
+      rgba(255,255,255,0.2)
+    ),
+    url('/stacked-waves-haikei.svg')
+  `,
+  backgroundSize: 'cover',
+  backgroundPosition: 'bottom center',
+}))
+
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-gradient-to-b from-gray-300 via-gray-200 to-gray-100 text-gray-800">
+  <div class="min-h-screen flex flex-col text-gray-800">
     <SidebarProvider class="flex flex-1">
-      <Sidebar>
+      <Sidebar class="bg-white">
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>ArtTeràpia App</SidebarGroupLabel>
+            <SidebarGroupLabel>ArteTerapia App</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem v-for="item in items" :key="item.title">
@@ -70,7 +93,8 @@ const items = [
       <div class="flex flex-1 flex-col">
 
         <!-- HEADER -->
-        <header class="sticky top-0 z-50 border-b bg-white/70 backdrop-blur">
+        <header class="sticky top-0 z-50 border-b bg-white/70 backdrop-blur"
+        :style="headerStyle">
           <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
 
             <div class="flex items-center gap-4">

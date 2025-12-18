@@ -1,14 +1,17 @@
-import axios from 'axios'
+import axios from '@/plugins/axios'
 
 const API_URL = 'http://127.0.0.1:8000' // tu backend FastAPI
 
 export const comfyService = {
 
-  async createImage(prompt, userId) {
+  async createImage(prompt, userId, sessionId = null) {
     try {
       // log payload for easier debugging
-      console.debug('createImage payload:', prompt)
-      const response = await axios.post(`${API_URL}/comfy/users/${userId}/images/`, prompt, {
+      console.debug('createImage payload:', prompt, 'sessionId:', sessionId)
+      const url = sessionId 
+        ? `${API_URL}/comfy/users/${userId}/images/?session_id=${sessionId}`
+        : `${API_URL}/comfy/users/${userId}/images/`
+      const response = await axios.post(url, prompt, {
         headers: { 'Content-Type': 'application/json' }
       })
       return response.data
@@ -19,28 +22,33 @@ export const comfyService = {
     }
   },
 
-  async convertirBoceto(prompt, userId) {
+  async convertirBoceto(prompt, userId, sessionId = null) {
     try {
-      // log payload for easier debugging
-      console.debug('createImage payload:', prompt)
-      const response = await axios.post(`${API_URL}/comfy/users/${userId}/sketch-images/`, prompt, {
+
+      const url = sessionId 
+        ? `${API_URL}/comfy/users/${userId}/sketch-images/?session_id=${sessionId}`
+        : `${API_URL}/comfy/users/${userId}/sketch-images/`
+      const response = await axios.post(url, prompt, {
         headers: { 'Content-Type': 'application/json' }
       })
       return response.data
     } catch (err) {
       // surface FastAPI validation error body in the client console
-      console.error('createImage error response:', err?.response?.data || err)
+      console.error('convertirBoceto error response:', err?.response?.data || err)
       throw err
     }
   },
 
-  async generateImageByMultiple(images, count, userId) {
+  async generateImageByMultiple(images, count, userId, sessionId = null) {
     try {
-      console.log('generateImageByMultiple called with images:', images, 'and count:', count)
+      console.log('generateImageByMultiple called with images:', images, 'and count:', count, 'sessionId:', sessionId)
       // backend expects { data: [{ fileName: '...' }, ...], count: N }
       const payload = { data: (images?.data ?? images).map(i => ({ fileName: i.fileName || i })), count }
       console.debug('generateImageByMultiple payload:', payload)
-      const response = await axios.post(`${API_URL}/comfy/users/${userId}/multiple-images/`, payload, {
+      const url = sessionId 
+        ? `${API_URL}/comfy/users/${userId}/multiple-images/?session_id=${sessionId}`
+        : `${API_URL}/comfy/users/${userId}/multiple-images/`
+      const response = await axios.post(url, payload, {
         headers: { 'Content-Type': 'application/json' }
       })
       return response.data

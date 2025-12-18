@@ -9,8 +9,8 @@ import app.crud as crud
 router = APIRouter()
 
 @router.get("/users/", response_model=List[schemas.User])
-async def read_users(db: SessionDep, skip: int = 0, limit: int = 10):
-    users = crud.user.get_users(db, skip=skip, limit=limit)
+async def read_users(db: SessionDep):
+    users = crud.user.get_users(db)
     return users
 
 @router.get("/users/me", response_model=schemas.User)

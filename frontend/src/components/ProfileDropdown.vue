@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from "vue"
 import {
   DropdownMenu,
@@ -71,32 +71,7 @@ const logout = () => {
       <DropdownMenuGroup>
         <DropdownMenuItem class="px-4 py-2.5 text-base">
           <UserIcon class="size-5" />
-          <span>My account</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem class="px-4 py-2.5 text-base">
-          <SettingsIcon class="size-5" />
-          <span>Settings</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem class="px-4 py-2.5 text-base">
-          <CreditCardIcon class="size-5" />
-          <span>Billing</span>
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
-
-      <DropdownMenuSeparator />
-
-      <DropdownMenuGroup>
-        <DropdownMenuItem class="px-4 py-2.5 text-base">
-          <UsersIcon class="size-5" />
-          <span>Manage team</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem class="px-4 py-2.5 text-base">
-          <SquarePenIcon class="size-5" />
-          <span>Customization</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem class="px-4 py-2.5 text-base">
-          <CirclePlusIcon class="size-5" />
-          <span>Add team account</span>
+          <span>Mi cuenta</span>
         </DropdownMenuItem>
       </DropdownMenuGroup>
 
@@ -104,7 +79,7 @@ const logout = () => {
 
       <DropdownMenuItem class="px-4 py-2.5 text-base text-red-600" @click="logout()">
         <LogOutIcon class="size-5"/>
-        <span>Logout</span>
+        <span>Cerrar Sesión</span>
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

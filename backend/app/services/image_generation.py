@@ -123,6 +123,9 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
     Raises:
         HTTPException: Si hay un error al generar la imagen
     """
+
+    translator= Translator(from_lang="es", to_lang="en")
+    prompt_text = translator.translate(prompt_text)
     
     if(input_img):
         with open(WORKFLOW_IMG2IMG_PATH, "r", encoding="utf-8") as f:
@@ -137,9 +140,6 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
         seed = prompt_seed
     else:
         seed = random.randint(0, MAX_SQLITE_INT)
-    
-    translator= Translator(from_lang="es", to_lang="en")
-    prompt_text = translator.translate(prompt_text)
 
     if(input_img):
         filename = input_img.rpartition('/')[-1]
