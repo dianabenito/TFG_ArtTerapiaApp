@@ -73,7 +73,7 @@ const onFile = (ev: Event) => {
                 <Textarea id="promptText" :model-value="promptText" placeholder="Describe tu boceto en detalle para reconvertirlo en una obra final." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
               </div>
 
-              <Button class="mt-3" @click="emit('uploadAndTransform')" :disabled="isLoadingGallery || !uploadFileName || !promptText?.trim()" variant="default">Transformar boceto</Button>
+              <Button class="mt-3" @click="emit('uploadAndTransform')" :disabled="isLoadingGallery || loading || !uploadFileName || !promptText?.trim()" variant="default">Transformar boceto</Button>
             </TabsContent>
 
             <TabsContent value="draw">

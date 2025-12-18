@@ -1,8 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userService } from '../api/userService.js'
 import { sessionsService } from '../api/sessionsService.js'
+import ChatPanel from '@/components/ChatPanel.vue'
+
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { ImageIcon, Info } from 'lucide-vue-next'
 
 const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
@@ -10,11 +26,19 @@ const router = useRouter()
 const sessionId = Number(route.params.sessionId)
 const role = 'therapist'
 
-const message = ref('Esperando paciente...')
+const chatMessages = ref([])
 const latestImage = ref('')
 const sessionInfo = ref(null)
-const chatMessages = ref([])       // ← mensajes del chat
-const newChatMessage = ref('')     // ← input del chat
+const patientUser = ref(null)
+const showDetails = ref(false)
+const artworkConfirmed = ref(false)  // ← detecta si el paciente confirmó la obra
+const showConfirmEndDialog = ref(false)
+const showSuccessEndDialog = ref(false)
+const showErrorEndDialog = ref(false)
+
+// Persistencia local por sesión para terapeuta
+const stateStorageKey = Number.isFinite(sessionId) ? `tgen_state_${sessionId}` : 'tgen_state_default'
+
 let socket = null
 
 const connectSocket = () => {
@@ -34,21 +58,21 @@ const connectSocket = () => {
       if (obj.event === 'submit_image' && obj.fileName) {
         const mount = obj.fileName.includes('generated') ? 'generated_images' : 'uploaded_images'
         latestImage.value = `${API_URL}/images/${mount}/${obj.fileName}`
-        message.value = 'Nueva imagen enviada por el paciente:'
+        artworkConfirmed.value = true  // ← imagen confirmada por el paciente
+        persistState()
       } else if (obj.event === 'chat_message') {
         chatMessages.value.push({ sender: obj.sender, text: obj.text })
+        persistState()
       }
     } catch (e) {
       const data = String(raw)
-      if (data === 'user_is_generating') {
-        message.value = 'El paciente está generando una imagen...'
-      } else if (data === 'session_ended') {
-        message.value = 'La sesión ha sido finalizada.'
+      if (data === 'session_ended') {
+        clearPersistedState()
         socket?.close()
       } else if (data.startsWith('new_image:')) {
         const filename = data.split(':')[1]
         latestImage.value = `${API_URL}/images/${filename}`
-        message.value = 'Nueva imagen enviada por el paciente:'
+        persistState()
       }
     }
   }
@@ -56,21 +80,33 @@ const connectSocket = () => {
   socket.onclose = () => console.log('WS cerrado')
 }
 
-const sendChatMessage = () => {
-  if (!newChatMessage.value || !socket || socket.readyState !== WebSocket.OPEN) return
-  const msg = { event: 'chat_message', sender: role, text: newChatMessage.value }
+const sendChatMessage = (text: string) => {
+  if (!text || !socket || socket.readyState !== WebSocket.OPEN) return
+  const msg = { event: 'chat_message', sender: role, text }
   socket.send(JSON.stringify(msg))
-  chatMessages.value.push(msg)   // reflejar localmente
-  newChatMessage.value = ''
+  chatMessages.value.push(msg)
+  persistState()
 }
 
 onMounted(async () => {
+  // Restaurar estado local si existe
+  restoreState()
   if (!Number.isFinite(sessionId)) return
   try {
     sessionInfo.value = await sessionsService.getSession(sessionId)
     if (sessionInfo.value?.ended_at) {
-      message.value = 'La sesión está finalizada.'
+      // Sesión finalizada: limpiar estado persistido y salir
+      clearPersistedState()
       return
+    }
+    // obtener datos del paciente
+    try {
+      const patientId = sessionInfo.value?.patient_id ?? sessionInfo.value?.patient?.id
+      if (patientId) {
+        patientUser.value = await userService.getUserById(patientId)
+      }
+    } catch (e) {
+      console.warn('No se pudo obtener datos del paciente:', e)
     }
   } catch (err) {
     console.warn('No se pudo obtener la sesión:', err)
@@ -82,49 +118,235 @@ onBeforeUnmount(() => socket?.close())
 
 const confirmEnd = async () => {
   if (!Number.isFinite(sessionId)) return
-  const ok = confirm('¿Confirmas que quieres finalizar la sesión? Esta acción la terminará para ambos participantes.')
-  if (!ok) return
+  showConfirmEndDialog.value = true
+}
 
+const executeEndSession = async () => {
+  showConfirmEndDialog.value = false
+  
   try {
     await sessionsService.endSession(sessionId)
     socket?.close()
-    alert('Sesión finalizada correctamente')
-    router.push('/home')
+    clearPersistedState()
+    showSuccessEndDialog.value = true
   } catch (err) {
     console.error(err)
-    alert('Error finalizando la sesión')
+    showErrorEndDialog.value = true
   }
 }
+
+const ensureUTCString = (dateString) => {
+  if (!dateString) return dateString
+  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+    return dateString + 'Z'
+  }
+  return dateString
+}
+
+const formatLocalDate = (utcString) => {
+  if (!utcString) return 'N/D'
+  return new Date(ensureUTCString(utcString)).toLocaleString('es-ES', {
+    timeZone: 'Europe/Madrid',
+    dateStyle: 'short',
+    timeStyle: 'short'
+  })
+}
+
+// Helpers de persistencia local
+const clearPersistedState = () => {
+  try {
+    localStorage.removeItem(stateStorageKey)
+  } catch (e) {
+    console.warn('No se pudo limpiar el estado local (terapeuta):', e)
+  }
+}
+
+const persistState = () => {
+  try {
+    const payload = {
+      latestImage: latestImage.value,
+      chatMessages: chatMessages.value,
+      artworkConfirmed: artworkConfirmed.value,
+    }
+    localStorage.setItem(stateStorageKey, JSON.stringify(payload))
+  } catch (e) {
+    console.warn('No se pudo guardar el estado local (terapeuta):', e)
+  }
+}
+
+const restoreState = () => {
+  try {
+    const raw = localStorage.getItem(stateStorageKey)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (typeof saved?.latestImage === 'string') latestImage.value = saved.latestImage
+    if (Array.isArray(saved?.chatMessages)) chatMessages.value = saved.chatMessages
+    if (typeof saved?.artworkConfirmed === 'boolean') artworkConfirmed.value = saved.artworkConfirmed
+  } catch (e) {
+    console.warn('No se pudo restaurar el estado local (terapeuta):', e)
+  }
+}
+
+// Persistir cuando cambian piezas clave
+watch(latestImage, persistState)
+watch(chatMessages, persistState, { deep: true })
 </script>
 
 <template>
-  <div>
-    <h1>Vista del Terapeuta</h1>
+  <div class="flex flex-col">
+    <!-- DIÁLOGO DE CONFIRMACIÓN PARA FINALIZAR SESIÓN -->
+    <AlertDialog :open="showConfirmEndDialog" @update:open="(val) => showConfirmEndDialog = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Finalizar sesión?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción terminará la sesión para ambos participantes y no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction @click="executeEndSession">Finalizar</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
-    <div v-if="sessionInfo">
-      <p><strong>Sesión ID:</strong> {{ sessionInfo.id }}</p>
-      <p><strong>Estado:</strong> {{ sessionInfo.ended_at ? 'Finalizada' : 'Activa' }}</p>
-    </div>
+    <!-- DIÁLOGO DE ÉXITO -->
+    <AlertDialog :open="showSuccessEndDialog" @update:open="(val) => showSuccessEndDialog = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión ha sido finalizada correctamente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end">
+          <AlertDialogAction @click="router.push('/home')">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
 
-    <p>{{ message }}</p>
+    <!-- DIÁLOGO DE ERROR -->
+    <AlertDialog :open="showErrorEndDialog" @update:open="(val) => showErrorEndDialog = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Error</AlertDialogTitle>
+          <AlertDialogDescription>
+            Ha ocurrido un error al finalizar la sesión. Por favor, inténtalo de nuevo.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end">
+          <AlertDialogAction @click="showErrorEndDialog = false">
+            Cerrar
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
 
-    <div v-if="latestImage">
-      <img :src="latestImage" alt="Imagen del paciente" style="max-width: 100%;" />
-    </div>
+    <!-- DIÁLOGO DE DETALLES DE SESIÓN -->
+    <Dialog :open="showDetails" @update:open="(val) => !val && (showDetails = false)">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Detalles de la sesión</DialogTitle>
+          <DialogDescription>Consulta la información detallada de la sesión actual.</DialogDescription>
+        </DialogHeader>
+        <dl v-if="sessionInfo" class="grid grid-cols-2 gap-x-1.5 gap-y-1 text-m">
+          <dt class="font-semibold">Paciente</dt>
+          <dd>{{ patientUser?.full_name ?? 'Cargando...' }}</dd>
 
-    <!-- Chat -->
-    <div v-if="!sessionInfo?.ended_at" class="chat-container" style="margin-top:1rem;">
-      <div class="chat-messages" style="max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:0.5rem; margin-bottom:0.5rem;">
-        <div v-for="(msg, i) in chatMessages" :key="i" :style="{ textAlign: msg.sender === role ? 'right' : 'left' }">
-          <strong>{{ msg.sender }}:</strong> {{ msg.text }}
+          <dt class="font-semibold">Fecha</dt>
+          <dd>{{ formatLocalDate(sessionInfo.start_date).slice(0, 8) }}</dd>
+
+          <dt class="font-semibold">Hora</dt>
+          <dd>{{ formatLocalDate(sessionInfo.start_date).slice(10, 16) }} - {{ formatLocalDate(sessionInfo.end_date).slice(10, 16) }}</dd>
+
+        </dl>
+      </DialogContent>
+    </Dialog>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div v-if="sessionInfo && !sessionInfo.ended_at" class="bg-muted/30 min-h-[calc(100vh-4rem)]">
+      <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
+        <!-- HEADER -->
+        <div class="flex items-start justify-between gap-3">
+          <div class="space-y-1">
+            <h1 class="text-2xl font-semibold text-slate-900">
+              {{ artworkConfirmed ? 'Obra completada' : 'Generación en progreso' }}
+            </h1>
+            <p class="text-sm text-slate-600">
+              {{ artworkConfirmed ? 'El paciente ha finalizado su obra.' : 'El paciente está trabajando en su obra.' }}
+            </p>
+          </div>
+
+          <!-- BOTÓN DE INFORMACIÓN -->
+          <Button
+            variant="ghost"
+            size="icon"
+            class="!h-11 !w-11 rounded-xl p-2.5"
+            @click="showDetails = true"
+            aria-label="Información"
+          >
+            <Info class="!h-8 !w-8" />
+          </Button>
+        </div>
+
+        <!-- LAYOUT IMAGEN + CHAT -->
+        <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
+          <!-- IMAGEN -->
+          <Card class="min-h-[600px] max-h-[600px] flex flex-col min-w-[420px]">
+            <CardContent class="flex items-center justify-center p-6">
+              <div v-if="latestImage" class="w-full min-w-[420px]">
+                <img
+                  :src="latestImage"
+                  class="w-full max-h-[70vh] rounded-xl border shadow-md object-contain bg-white"
+                />
+              </div>
+              <div v-else class="text-center text-muted-foreground space-y-2">
+                <ImageIcon class="h-12 w-12 mx-auto opacity-50" />
+                <p class="text-sm">Esperando imagen del paciente...</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- CHAT -->
+          <ChatPanel
+            class="h-full"
+            :messages="chatMessages"
+            :role="role"
+            :otherUser="patientUser"
+            title="Chat con paciente"
+            selfTone="blue"
+            otherTone="gray"
+            otherLabel="Paciente"
+            @send="(text) => sendChatMessage(text)"
+          />
+        </div>
+
+        <!-- BOTÓN FINALIZAR SESIÓN -->
+        <div class="flex justify-center pt-2">
+          <Button
+            size="lg"
+            variant="destructive"
+            class="px-10 py-5 text-lg font-bold rounded-full shadow-lg"
+            @click="confirmEnd"
+          >
+            Finalizar sesión
+          </Button>
         </div>
       </div>
-      <input v-model="newChatMessage" @keyup.enter="sendChatMessage" placeholder="Escribe un mensaje..." style="width:70%" />
-      <button @click="sendChatMessage" style="width:25%">Enviar</button>
     </div>
 
-    <div v-if="!sessionInfo?.ended_at" style="margin-top: 1rem;">
-      <button @click="confirmEnd">Finalizar sesión</button>
+    <!-- SESIÓN FINALIZADA -->
+    <div v-else class="bg-muted/30 min-h-[calc(100vh-4rem)] flex items-center justify-center">
+      <Card class="max-w-md">
+        <CardContent class="text-center py-8">
+          <ImageIcon class="h-12 w-12 mx-auto opacity-50 mb-4" />
+          <h2 class="text-xl font-semibold mb-2">Sesión finalizada</h2>
+          <p class="text-sm text-muted-foreground mb-6">La sesión ha sido cerrada. Puedes volver al inicio.</p>
+          <Button @click="() => router.push('/home')">Volver al inicio</Button>
+        </CardContent>
+      </Card>
     </div>
   </div>
 </template>

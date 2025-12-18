@@ -10,6 +10,7 @@ const props = defineProps<{
   open: boolean
   loading: boolean
   tempImageUrl?: string | null
+  selectedGalleryImageName?: string | null
   promptText: string
   isLoadingGallery: boolean
   uploadFileName?: string | null
@@ -65,35 +66,37 @@ const onFile = (ev: Event) => {
                 </div>
               </div>
 
-              <Button @click="emit('uploadImage')" :disabled="isLoadingGallery || !uploadFileName" variant="default">Subir imagen</Button>
+              <div class="h-px bg-border my-4"  />
 
-              <div class="h-px bg-border my-4" v-if="tempImageUrl" />
-
-              <div class="grid gap-2" v-if="tempImageUrl">
+              <div class="grid gap-2">
                 <Label for="promptText">Paso 2: Describe la obra que quieres crear a partir de la imagen subida:</Label>
                 <Textarea id="promptText" :model-value="promptText" placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
               </div>
 
               <div class="flex justify-start mt-3">
-                <Button v-if="tempImageUrl" variant="default" class="px-4 py-2" @click="emit('convert')" :disabled="loading || !promptText?.trim()">Convertir la imagen con texto</Button>
+                <Button variant="default" class="px-4 py-2" @click="emit('uploadImage')" :disabled="loading || !promptText?.trim() || !uploadFileName">Convertir la imagen con texto</Button>
               </div>
             </TabsContent>
 
             <TabsContent value="gallery">
               <div class="grid gap-2">
                 <Label>Paso 1: Escoge una imagen de la galería de imágenes:</Label>
-                <Button variant="default" class="px-4 py-2 w-fit mt-1" @click="emit('openGallery')" :disabled="isLoadingGallery">Ver galería</Button>
+                <div class="flex items-center gap-3">
+                  <Button variant="default" class="px-4 py-2 w-fit mt-1" @click="emit('openGallery')" :disabled="isLoadingGallery">Ver galería</Button>
+                  <span v-if="selectedGalleryImageName" class="text-sm text-muted-foreground truncate max-w-xs">{{ selectedGalleryImageName }}</span>
+                  <span v-else class="text-sm text-muted-foreground">Ninguna imagen seleccionada</span>
+                </div>
               </div>
 
-              <div class="h-px bg-border my-4" v-if="tempImageUrl" />
+              <div class="h-px bg-border my-4" v-if="selectedGalleryImageName" />
 
-              <div class="grid gap-2" v-if="tempImageUrl">
+              <div class="grid gap-2" v-if="selectedGalleryImageName">
                 <Label for="promptText" class="leading-normal">Paso 2: Describe la obra que quieres crear a partir de la imagen seleccionada:</Label>
                 <Textarea id="promptText" :model-value="promptText" placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
               </div>
 
               <div class="flex justify-start mt-3">
-                <Button v-if="tempImageUrl" variant="default" class="px-4 py-2" @click="emit('convert')" :disabled="loading || !promptText?.trim()">Convertir la imagen con texto</Button>
+                <Button v-if="selectedGalleryImageName" variant="default" class="px-4 py-2" @click="emit('convert')" :disabled="loading || !promptText?.trim()">Convertir la imagen con texto</Button>
               </div>
             </TabsContent>
           </Tabs>

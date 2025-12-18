@@ -5,7 +5,7 @@ import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService.js'
 import { sessionsService } from '../api/sessionsService.js'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast } from '../stores/toastStore.js'
+import { toast } from 'vue-sonner'
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,11 +23,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
 import GalleryDialog from '@/components/GalleryDialog.vue'
 import RefineModal from '@/components/RefineModal.vue'
 import ImagesModal from '@/components/ImagesModal.vue'
 import DrawModal from '@/components/DrawModal.vue'
+import MultiImageModal from '@/components/MultiImageModal.vue'
 import { FolderOpen, Brush, Send, PenTool, ImageIcon, Layers, Loader2, Info, HelpCircle, PanelRightClose, MessageCircle } from 'lucide-vue-next'
 
 const API_URL = 'http://127.0.0.1:8000'
@@ -45,6 +55,7 @@ const imageUrl = ref('')
 const tempImageUrl = ref('')
 const seedLastImg = ref(null)
 const uploadFile = ref(null)
+const selectedGalleryImageName = ref('')
 const active_user = ref(null)          // usuario actual
 const therapistUser = ref(null)        // terapeuta asociado a la sesión
 const isLoading = ref(false)
@@ -86,8 +97,11 @@ const showInstructions = ref(false)
 const showRefineModal = ref(false)
 const showImagesModal = ref(false)
 const showDrawModal = ref(false)
+const showMultiImageModal = ref(false)
 const modalLoading = ref(false)
 const showDetails = ref(false)
+const showSessionEndedAlert = ref(false)
+const showSessionAlreadyEndedAlert = ref(false)
 
 let ws = null
 
@@ -129,13 +143,8 @@ const connectWs = () => {
         sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
         clearPersistedState()
         ws?.close()
-        // redirigir al paciente a Home
-        try {
-          alert('La sesión ha sido finalizada por el terapeuta.')
-          router.push('/home')
-        } catch (e) {
-          console.warn('No se pudo redirigir tras finalización de sesión:', e)
-        }
+        // mostrar alert y redirigir al paciente a Home
+        showSessionEndedAlert.value = true
         return
       }
       console.log('WS message:', ev.data)
@@ -193,14 +202,8 @@ onMounted(async () => {
       sessionInfo.value = await sessionsService.getSession(sessionId)
       // si la sesión ya está finalizada, mostrar alerta y redirigir al home
       if (sessionInfo.value?.ended_at) {
-        try {
-          alert('La sesión ha finalizado.')
-          clearPersistedState()
-          router.push('/home')
-          return
-        } catch (e) {
-          console.warn('No se pudo redirigir tras detectar sesión finalizada:', e)
-        }
+        showSessionAlreadyEndedAlert.value = true
+        return
       }
     } catch (err) {
       console.warn('No se pudo obtener la sesión:', err)
@@ -273,6 +276,32 @@ const sendChatFromChild = (text: string) => {
   sendChatMessage()
 }
 
+// Handlers para bloquear cierre de modales mientras se genera imagen
+const handleRefineModalClose = (val: boolean) => {
+  if (!val && !modalLoading.value) {
+    showRefineModal.value = false
+  }
+}
+
+const handleImagesModalClose = (val: boolean) => {
+  if (!val && !modalLoading.value) {
+    showImagesModal.value = false
+  }
+}
+
+const handleDrawModalClose = (val: boolean) => {
+  if (!val && !modalLoading.value) {
+    showDrawModal.value = false
+  }
+}
+
+const handleMultiImageModalClose = (val: boolean) => {
+  if (!val && !modalLoading.value) {
+    showMultiImageModal.value = false
+    selectedImages.value = []
+  }
+}
+
 const generateImage = async (last_seed = null, inputImage = null) => {
   try {
     modalLoading.value = true
@@ -312,7 +341,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
   } catch (e) {
     // show server-side validation errors if any
     const detail = e?.response?.data?.detail || e?.message || String(e)
-    showToast('Error generando imagen: ' + detail, { type: 'error' })
+    toast.error('Error generando imagen: ' + detail)
     console.error('Error generating image:', e)
   } finally {
     modalLoading.value = false
@@ -345,7 +374,7 @@ const createFromSketch = async(inputImage) => {
   } catch (e) {
     // show server-side validation errors if any
     const detail = e?.response?.data?.detail || e?.message || String(e)
-    showToast('Error generando imagen: ' + detail, { type: 'error' })
+    toast.error('Error generando imagen: ' + detail)
     console.error('Error generating image:', e)
   } finally {
     modalLoading.value = false
@@ -383,7 +412,7 @@ const modalRegenerate = async () => {
       }
     }
   } catch (e) {
-    showToast('Error regenerando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)), { type: 'error' })
+    toast.error('Error regenerando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)))
     console.error('Modal regenerate error:', e)
   } finally {
     modalLoading.value = false
@@ -435,16 +464,16 @@ const onFileChange = (arg: any) => {
 }
 
 const uploadUserImage = async () => {
-  if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
+  if (!uploadFile.value) return toast.warning('Selecciona una imagen primero')
   try {
     isLoading.value = true
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
     console.log('Imagen subida:', resp)
     if (resp.file) {
-      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+      // tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
       seedLastImg.value = resp.seed
-      showToast('Imagen subida correctamente', { type: 'success' })
+      toast.success('Imagen subida correctamente')
       uploadFile.value = null
       // Refresh gallery to show uploaded image
       try {
@@ -454,15 +483,15 @@ const uploadUserImage = async () => {
       }
     }
   } catch (e) {
-    showToast('Error subiendo imagen', { type: 'error' })
+    toast.error('Error subiendo imagen')
     console.error(e)
   } finally {
     isLoading.value = false
   }
 }
 
-const uploadAndTransformSketch = async () => {
-  if (!uploadFile.value) return showToast('Selecciona una imagen primero', { type: 'warning' })
+const uploadUserImageandAddText = async () => {
+  if (!uploadFile.value) return toast.warning('Selecciona una imagen primero')
   try {
     isLoading.value = true
     active_user.value = await userService.getCurrentUser()
@@ -471,7 +500,36 @@ const uploadAndTransformSketch = async () => {
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
       seedLastImg.value = resp.seed
-      showToast('Imagen subida correctamente', { type: 'success' })
+      toast.success('Imagen subida correctamente')
+      uploadFile.value = null
+
+      await generateImage(null, tempImageUrl.value)
+      // Refresh gallery to show uploaded image
+      try {
+        await loadGallery()
+      } catch (e) {
+        console.warn('No se pudo recargar la galería tras subir imagen:', e)
+      }
+    }
+  } catch (e) {
+    toast.error('Error subiendo imagen')
+    console.error(e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const uploadAndTransformSketch = async () => {
+  if (!uploadFile.value) return toast.warning('Selecciona una imagen primero')
+  try {
+    isLoading.value = true
+    active_user.value = await userService.getCurrentUser()
+    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
+    console.log('Imagen subida:', resp)
+    if (resp.file) {
+      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+      seedLastImg.value = resp.seed
+      toast.success('Imagen subida correctamente')
       uploadFile.value = null
       
       await createFromSketch(tempImageUrl.value)
@@ -483,7 +541,7 @@ const uploadAndTransformSketch = async () => {
       }
     }
   } catch (e) {
-    showToast('Error subiendo imagen', { type: 'error' })
+    toast.error('Error subiendo imagen: ' + (e?.response?.data?.detail || e?.message || String(e)))
     console.error(e)
   } finally {
     isLoading.value = false
@@ -494,9 +552,16 @@ const uploadAndTransformSketch = async () => {
 const openSelectImagesModal = async () => {
   prompt.value.promptText = ''
   chatOpen.value = false
-  tempImageUrl.value = imageUrl.value
+  tempImageUrl.value = ''
+  selectedGalleryImageName.value = ''
   showImagesModal.value = true
   modalLoading.value = false
+}
+
+const convertGalleryImage = async () => {
+  if (!selectedGalleryImageName.value) return
+  tempImageUrl.value = getImageUrl(selectedGalleryImageName.value)
+  await generateImage(null, tempImageUrl.value)
 }
 
 const openDrawModal = async () => {
@@ -522,7 +587,7 @@ const submitImage = () => {
   }))
   // mostrar confirmación de envío al usuario
   try {
-    showToast('Imagen enviada correctamente', { type: 'success', duration: 2200 })
+    toast.success('Imagen enviada correctamente')
   } catch (e) {
     console.warn('No se pudo mostrar toast tras enviar la imagen:', e)
   }
@@ -572,7 +637,7 @@ const loadGallery = async () => {
 
   } catch (e) {
     console.error("Error cargando galería:", e)
-    showToast("Error cargando galería", { type: "error" })
+    toast.error('Error cargando galería: ' + (e?.response?.data?.detail || e?.message || String(e)))
   } finally {
     isLoadingGallery.value = false
   }
@@ -594,10 +659,10 @@ const getImageUrl = (fileName) => {
 
 // Función para seleccionar imagen desde la galería
 const selectImage = (img) => {
-  tempImageUrl.value = getImageUrl(img.fileName)
+  selectedGalleryImageName.value = img.fileName
   seedLastImg.value = img.seed
-  showToast("Imagen seleccionada de la galería", { type: "success" })
-  console.log('Imagen seleccionada:', tempImageUrl.value)
+  toast.success("Imagen seleccionada de la galería")
+  console.log('Imagen seleccionada:', img.fileName)
   showGallery.value = false
 }
 
@@ -605,7 +670,7 @@ const openGalleryModal = () => {
   showMultiSelectMode.value = false
   selectedImages.value = []  
   if (!combinedGallery.value.length) {
-    showToast('No hay imágenes en tu galería', { type: 'info' })
+    toast.info('No hay imágenes en tu galería')
     return
   }
   showGallery.value = true
@@ -613,14 +678,14 @@ const openGalleryModal = () => {
 
 const openGalleryModalMultiselect = () => {
   chatOpen.value = false
-  showMultiSelectMode.value = true
-  multiSelectMode.value = true
-  selectedImages.value = []  
+  selectedImages.value = []
+  tempImageUrl.value = ''
   if (!combinedGallery.value.length) {
-    showToast('No hay imágenes en tu galería', { type: 'info' })
+    toast.info('No hay imágenes en tu galería')
     return
   }
-  showGallery.value = true
+  showMultiImageModal.value = true
+  modalLoading.value = false
 }
 
 
@@ -638,13 +703,59 @@ const toggleImageSelection = (img) => {
     // añadir a la selección
     selectedImages.value.push(img)
   } else {
-    showToast(`Solo puedes seleccionar entre ${minMultiSelect} y ${maxMultiSelect} imágenes`, { type: 'warning' })
+    toast.warning(`Solo puedes seleccionar entre ${minMultiSelect} y ${maxMultiSelect} imágenes`)
   }
+}
+
+const generateMultiImage = async () => {
+  if (selectedImages.value.length < minMultiSelect) {
+    toast.warning(`Selecciona al menos ${minMultiSelect} imágenes`)
+    return
+  }
+
+  try {
+    modalLoading.value = true
+    tempImageUrl.value = ''
+
+    const imagesPayload = {
+      data: selectedImages.value.map(img => ({ fileName: img.fileName }))
+    }
+
+    active_user.value = await userService.getCurrentUser()
+    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id)
+    console.log('Imagen generada por múltiples imágenes:', response)
+
+    if (response.file) {
+      tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
+      seedLastImg.value = response.seed
+      try {
+        await loadGallery()
+      } catch (e) {
+        console.warn('No se pudo recargar la galería tras generar imagen múltiple:', e)
+      }
+    }
+  } catch (e) {
+    toast.error('Error generando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)))
+    console.error('Error generating image from multiple images:', e)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+const modalMultiImageConfirm = () => {
+  if (tempImageUrl.value && tempImageUrl.value !== '') {
+    imageUrl.value = tempImageUrl.value
+    seedLastImg.value = seedLastImg.value
+  }
+  showMultiImageModal.value = false
+  selectedImages.value = []
+  submitImage()
+  persistState()
 }
 
 const confirmMultiSelect = async () => {
   if (selectedImages.value.length < minMultiSelect) {
-    showToast(`Selecciona al menos ${minMultiSelect} imágenes`, { type: 'warning' })
+    toast.warning(`Selecciona al menos ${minMultiSelect} imágenes`)
     return
   }
 
@@ -679,7 +790,7 @@ const confirmMultiSelect = async () => {
       }
     }
   } catch (e) {
-    showToast('Error generando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)), { type: 'error' })
+    toast.error('Error generando imagen: ' + (e?.response?.data?.detail || e?.message || String(e)))
     console.error('Error generating image from multiple images:', e)
   } finally {
     modalLoading.value = false
@@ -717,15 +828,13 @@ const formatLocalDate = (utcString) => {
 </script>
 
 <template>
-
   <div class="flex flex-col">
-
     <Dialog :open="showDetails"  @update:open="(val) => !val && (showDetails = false)" >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Detalles de la sesión</DialogTitle>
           <DialogDescription>
-            Consulta la información detallada de la sesión seleccionada.
+            Consulta la información detallada de la sesión actual.
           </DialogDescription>
         </DialogHeader>
           <dl class="grid grid-cols-2 gap-x-1.5 gap-y-1 text-m">
@@ -743,6 +852,38 @@ const formatLocalDate = (utcString) => {
 
       </DialogContent>
     </Dialog>
+
+    <AlertDialog :open="showSessionAlreadyEndedAlert" @update:open="(val) => showSessionAlreadyEndedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión ha finalizado.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="() => { clearPersistedState(); router.push('/home'); }">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="showSessionEndedAlert" @update:open="(val) => showSessionEndedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión ha sido finalizada por el terapeuta.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="router.push('/home')">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <Dialog
       :open="showInstructions"
@@ -817,7 +958,7 @@ const formatLocalDate = (utcString) => {
       class="transition-all duration-300 bg-muted/30"
       :class="chatOpen ? 'mr-80' : 'mr-0'"
     >
-      <div class="max-w-7xl mx-auto px-6 py-8 space-y-10">
+      <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
 
         <!-- OVERLAY DE CARGA -->
         <div
@@ -833,11 +974,11 @@ const formatLocalDate = (utcString) => {
         <!-- HEADER -->
         <div class="flex items-start justify-between gap-6">
           <!-- TEXTO IZQUIERDA -->
-          <div>
-            <h1 class="text-xl font-semibold">
+          <div class="space-y-1">
+            <h1 class="text-2xl font-semibold text-slate-900">
               Genera tu obra de Arteterapia
             </h1>
-            <p class="text-sm text-muted-foreground mt-1">
+            <p class="text-sm text-slate-600">
               Explora distintas formas de creación a partir de texto, imágenes o bocetos.
             </p>
           </div>
@@ -932,7 +1073,7 @@ const formatLocalDate = (utcString) => {
               <Brush class="h-8 w-8" />
               <h3 class="font-semibold">Desde boceto</h3>
               <p class="text-sm text-muted-foreground">
-                Dibuja o sube un boceto inicial
+                Dibuja o sube un boceto inicial para convertirlo en una obra 
               </p>
             </CardContent>
           </Card>
@@ -940,9 +1081,9 @@ const formatLocalDate = (utcString) => {
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openGalleryModalMultiselect">
             <CardContent class="p-6 flex flex-col items-center text-center gap-3">
               <Layers class="h-8 w-8" />
-              <h3 class="font-semibold">Mezclar imágenes</h3>
+              <h3 class="font-semibold">Mezcla de imágenes</h3>
               <p class="text-sm text-muted-foreground">
-                Combina varias imágenes en una sola obra
+                Combina varias imágenes para crear una nueva obra
               </p>
             </CardContent>
           </Card>
@@ -965,15 +1106,30 @@ const formatLocalDate = (utcString) => {
 
     <!-- VISTA FINAL · IMAGEN + CHAT -->
     <div v-else class="bg-muted/30 min-h-[calc(100vh-4rem)]">
-      <div class="max-w-7xl mx-auto px-6 py-8">
+      <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
+        <!-- HEADER -->
+        <div class="flex items-start justify-between gap-6">
+          <div class="space-y-1">
+            <h2 class="text-2xl font-semibold text-slate-900">Tu obra de la sesión</h2>
+            <p class="text-sm text-slate-600">Has completado tu obra, este es tu espacio 
+              para comentarla con el terapeuta.</p>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            class="!h-11 !w-11 rounded-xl p-2.5"
+            @click="showDetails = true"
+            aria-label="Información"
+          >
+            <Info class="!h-8 !w-8" />
+          </Button>
+        </div>
+
         <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
-          <Card class="h-full">
-            <CardHeader>
-              <CardTitle>Obra final enviada</CardTitle>
-              <CardDescription>Imagen confirmada para la sesión.</CardDescription>
-            </CardHeader>
-            <CardContent class="flex items-center justify-center">
-              <div v-if="imageUrl" class="w-full">
+          <Card class="min-h-[600px] max-h-[600px] min-w-[420px] flex flex-col">
+            <CardContent class="flex items-center justify-center p-6">
+              <div v-if="imageUrl" class="w-full min-w-[420px]">
                 <img
                   :src="imageUrl"
                   class="w-full max-h-[70vh] rounded-xl border shadow-md object-contain bg-white"
@@ -1003,7 +1159,7 @@ const formatLocalDate = (utcString) => {
       :loading="modalLoading"
       :tempImageUrl="tempImageUrl"
       v-model:promptText="prompt.promptText"
-      @update:open="(val) => !val && (showRefineModal = false)"
+      @update:open="handleRefineModalClose"
       @generate="modalRegenerate"
       @confirm="modalTextConfirm"
     />
@@ -1012,14 +1168,15 @@ const formatLocalDate = (utcString) => {
       :open="showImagesModal"
       :loading="modalLoading"
       :tempImageUrl="tempImageUrl"
+      :selectedGalleryImageName="selectedGalleryImageName"
       :isLoadingGallery="isLoadingGallery"
       :uploadFileName="uploadFile ? uploadFile.name : null"
       v-model:promptText="prompt.promptText"
-      @update:open="(val) => !val && (showImagesModal = false)"
+      @update:open="handleImagesModalClose"
       @fileChange="onFileChange"
-      @uploadImage="uploadUserImage"
+      @uploadImage="uploadUserImageandAddText"
       @openGallery="openGalleryModal"
-      @convert="() => generateImage(null, tempImageUrl)"
+      @convert="convertGalleryImage"
       @confirm="modalImagesConfirm"
     />
 
@@ -1031,12 +1188,33 @@ const formatLocalDate = (utcString) => {
       :isLoadingGallery="isLoadingGallery"
       :uploadFileName="uploadFile ? uploadFile.name : null"
       v-model:promptText="prompt.promptText"
-      @update:open="(val) => !val && (showDrawModal = false)"
+      @update:open="handleDrawModalClose"
       @update:activeTab="(v) => (activeDrawTab = v)"
       @fileChange="onFileChange"
       @uploadAndTransform="uploadAndTransformSketch"
       @drawSketch="drawSketch"
       @confirm="modalDrawConfirm"
+    />
+
+    <MultiImageModal
+      :open="showMultiImageModal"
+      :loading="modalLoading"
+      :tempImageUrl="tempImageUrl"
+      :templates="galleryImages.templates"
+      :generated="galleryImages.generated"
+      :uploaded="galleryImages.uploaded"
+      :selectedImages="selectedImages"
+      :minMultiSelect="minMultiSelect"
+      :maxMultiSelect="maxMultiSelect"
+      :getImageUrl="getImageUrl"
+      @update:open="handleMultiImageModalClose"
+      @toggle="toggleImageSelection"
+      @generate="generateMultiImage"
+      @confirm="modalMultiImageConfirm"
+      :isLoadingGallery="isLoadingGallery"
+      :uploadFileName="uploadFile ? uploadFile.name : null"
+      @fileChange="onFileChange"
+      @uploadImage="uploadUserImage"
     />
 
   
@@ -1073,11 +1251,11 @@ const formatLocalDate = (utcString) => {
 
       <div
         v-show="chatOpen"
-        class="fixed right-0 z-[60] w-80 flex flex-col border-l shadow-lg transition-all duration-300"
+        class="fixed right-0 z-[60] w-80 flex flex-col border-l shadow-lg transition-all duration-300 rounded-t-xl"
         style="top: 4rem; height: calc(100% - 4rem); background-color: rgb(245, 250, 255);"
       >
-        <!-- HEADER -->
-        <div class="flex items-center justify-between px-4 py-3 border-b" style="background-color: rgba(96, 165, 250, 0.4);">
+      <!-- HEADER -->
+        <div class="flex items-center justify-between px-4 py-3 border-b rounded-t-xl" style="background-color: rgba(96, 165, 250, 0.6);">
           <div class="flex items-center gap-2">
             <h2 class="text-sm font-semibold text-black">
               Chat con el terapeuta
@@ -1117,7 +1295,7 @@ const formatLocalDate = (utcString) => {
         </div>
 
         <!-- FOOTER -->
-        <div class="p-3 border-t" style="background-color: rgba(96, 165, 250, 0.3);">
+        <div class="p-3 border-t" style="background-color: rgba(96, 165, 250, 0.25);">
           <div class="flex gap-2">
             <Input
               v-model="newChatMessage"
