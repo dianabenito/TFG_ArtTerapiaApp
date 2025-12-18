@@ -50,7 +50,7 @@ const emit = defineEmits<{
               :disabled="loading || !promptText?.trim()"
               @click="emit('generate')"
             >
-              Generar imagen
+              {{ loading ? 'Generando...' : 'Generar imagen' }}
             </Button>
           </div>
         </div>

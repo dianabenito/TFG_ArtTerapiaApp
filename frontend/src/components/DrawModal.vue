@@ -73,7 +73,9 @@ const onFile = (ev: Event) => {
                 <Textarea id="promptText" :model-value="promptText" placeholder="Describe tu boceto en detalle para reconvertirlo en una obra final." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
               </div>
 
-              <Button class="mt-3" @click="emit('uploadAndTransform')" :disabled="isLoadingGallery || loading || !uploadFileName || !promptText?.trim()" variant="default">Transformar boceto</Button>
+              <div class="flex justify-end mt-3">
+                <Button @click="emit('uploadAndTransform')" :disabled="isLoadingGallery || loading || !uploadFileName || !promptText?.trim()" variant="default">{{ loading ? 'Generando...' : 'Transformar boceto' }}</Button>
+              </div>
             </TabsContent>
 
             <TabsContent value="draw">
@@ -81,7 +83,7 @@ const onFile = (ev: Event) => {
                 <Label for="promptText">Diseña un nuevo boceto en el editor:</Label>
               </div>
               <div class="flex justify-start mt-3">
-                <Button variant="default" class="px-4 py-2" @click="emit('drawSketch')">
+                <Button variant="default" class="px-4 py-2" @click="emit('drawSketch')" :disabled="loading || isLoadingGallery">
                   <Brush class="h-4 w-4" />
                   Ir a dibujar boceto
                 </Button>

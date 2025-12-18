@@ -183,14 +183,16 @@ const onFileAndUpload = (ev: Event) => {
             </TabsContent>
           </Tabs>
 
-          <Button
-            variant="default"
-            class="px-3 py-2 w-full text-sm"
-            @click="emit('generate')"
-            :disabled="!canGenerate || loading"
-          >
-            {{ loading ? 'Generando...' : 'Generar imagen combinada' }}
-          </Button>
+          <div class="flex justify-end">
+            <Button
+              variant="default"
+              class="px-3 py-2 text-sm"
+              @click="emit('generate')"
+              :disabled="!canGenerate || loading"
+            >
+              {{ loading ? 'Generando...' : 'Generar imagen combinada' }}
+            </Button>
+          </div>
         </div>
 
         <!-- SEPARADOR -->

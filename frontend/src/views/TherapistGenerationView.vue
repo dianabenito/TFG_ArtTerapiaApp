@@ -58,7 +58,10 @@ const connectSocket = () => {
       if (obj.event === 'submit_image' && obj.fileName) {
         const mount = obj.fileName.includes('generated') ? 'generated_images' : 'uploaded_images'
         latestImage.value = `${API_URL}/images/${mount}/${obj.fileName}`
-        artworkConfirmed.value = true  // ← imagen confirmada por el paciente
+        // No confirmar la obra aún; solo actualizar la imagen
+        persistState()
+      } else if (obj.event === 'confirm_artwork') {
+        artworkConfirmed.value = true
         persistState()
       } else if (obj.event === 'chat_message') {
         chatMessages.value.push({ sender: obj.sender, text: obj.text })
@@ -266,13 +269,13 @@ watch(chatMessages, persistState, { deep: true })
     </Dialog>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <div v-if="sessionInfo && !sessionInfo.ended_at" class="bg-muted/30 min-h-[calc(100vh-4rem)]">
+    <div v-if="sessionInfo && !sessionInfo.ended_at" class="bg-slate-300/30 min-h-[calc(100vh-4rem)]">
       <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
         <!-- HEADER -->
         <div class="flex items-start justify-between gap-3">
           <div class="space-y-1">
             <h1 class="text-2xl font-semibold text-slate-900">
-              {{ artworkConfirmed ? 'Obra completada' : 'Generación en progreso' }}
+              {{ artworkConfirmed ? 'El paciente ha completado su obra' : 'Se está generando la obra' }}
             </h1>
             <p class="text-sm text-slate-600">
               {{ artworkConfirmed ? 'El paciente ha finalizado su obra.' : 'El paciente está trabajando en su obra.' }}
@@ -338,15 +341,22 @@ watch(chatMessages, persistState, { deep: true })
     </div>
 
     <!-- SESIÓN FINALIZADA -->
-    <div v-else class="bg-muted/30 min-h-[calc(100vh-4rem)] flex items-center justify-center">
-      <Card class="max-w-md">
-        <CardContent class="text-center py-8">
-          <ImageIcon class="h-12 w-12 mx-auto opacity-50 mb-4" />
-          <h2 class="text-xl font-semibold mb-2">Sesión finalizada</h2>
-          <p class="text-sm text-muted-foreground mb-6">La sesión ha sido cerrada. Puedes volver al inicio.</p>
-          <Button @click="() => router.push('/home')">Volver al inicio</Button>
-        </CardContent>
-      </Card>
+    <div v-else class="min-h-[calc(100vh-4rem)]">
+      <AlertDialog :open="true" @update:open="(v) => { if (!v) router.push('/home') }">
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+            <AlertDialogDescription>
+              La sesión ha sido cerrada. Puedes volver al inicio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div class="flex justify-end">
+            <AlertDialogAction @click="router.push('/home')">
+              Volver al inicio
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   </div>
 </template>

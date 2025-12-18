@@ -1,6 +1,6 @@
 <template>
-  <div class="max-w-6xl mx-auto p-4 min-h-[calc(100vh-4rem)] space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+  <div class="mx-auto p-4 min-h-[calc(100vh-4rem)] space-y-4 bg-slate-300/30">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-6">
       <div class="space-y-1">
         <h1 class="text-2xl font-semibold text-slate-900">Calendario</h1>
         <p v-if="user?.type === 'therapist'" class="text-sm text-slate-600">Consulta tu agenda y gestiona tus sesiones.</p>
@@ -8,7 +8,7 @@
       </div>
     </div>
 
-    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mx-6">
       <FullCalendar
         :options="calendarOptions"
         @eventClick="handleEventClick"

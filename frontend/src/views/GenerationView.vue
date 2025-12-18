@@ -324,7 +324,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
 
     // DESCOMENTAR ESTO PARA USAR USUARIO ACTIVO
     active_user.value = await userService.getCurrentUser()
-    const response = await comfyService.createImage(prompt.value, active_user.value.id)
+    const response = await comfyService.createImage(prompt.value, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
     
 
     if (response.file) {
@@ -357,7 +357,9 @@ const createFromSketch = async(inputImage) => {
     sketchPrompt.value.sketchImage = inputImage
 
     active_user.value = await userService.getCurrentUser()
-    const response = await comfyService.convertirBoceto(sketchPrompt.value, active_user.value.id)
+    const response = Number.isFinite(sessionId) 
+      ? await comfyService.convertirBoceto(sketchPrompt.value, active_user.value.id, sessionId)
+      : await comfyService.convertirBoceto(sketchPrompt.value, active_user.value.id)
     console.log('Imagen generada:', response)
 
     if (response.file) {
@@ -399,7 +401,7 @@ const modalRegenerate = async () => {
     const seedToUse = prompt.value.seed ?? null
 
     active_user.value = await userService.getCurrentUser()
-    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, active_user.value.id)
+    const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
     console.log('Modal regenerate:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${resp.file}`
@@ -594,7 +596,11 @@ const submitImage = () => {
 }
 
 const confirmFinalArtwork = () => {
-  submitImage()
+  if (!ws || ws.readyState !== WebSocket.OPEN) return
+  ws.send(JSON.stringify({
+    event: 'confirm_artwork',
+    fileName: imageUrl.value.split('/').pop()
+  }))
   showFinalView.value = true
   chatOpen.value = true
   persistState()
@@ -722,7 +728,7 @@ const generateMultiImage = async () => {
     }
 
     active_user.value = await userService.getCurrentUser()
-    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id)
+    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
     console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
@@ -775,7 +781,7 @@ const confirmMultiSelect = async () => {
     }
 
     active_user.value = await userService.getCurrentUser()
-    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id)
+    const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
     console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
@@ -955,7 +961,7 @@ const formatLocalDate = (utcString) => {
     <!-- CONTENIDO PRINCIPAL -->
     <div
       v-if="!showFinalView"
-      class="transition-all duration-300 bg-muted/30"
+      class="transition-all duration-300 bg-slate-300/30"
       :class="chatOpen ? 'mr-80' : 'mr-0'"
     >
       <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
@@ -1105,7 +1111,7 @@ const formatLocalDate = (utcString) => {
     </div>
 
     <!-- VISTA FINAL · IMAGEN + CHAT -->
-    <div v-else class="bg-muted/30 min-h-[calc(100vh-4rem)]">
+    <div v-else class="bg-slate-300/30 min-h-[calc(100vh-4rem)]">
       <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
         <!-- HEADER -->
         <div class="flex items-start justify-between gap-6">

@@ -167,6 +167,8 @@ const ensureUTCString = (dateString) => {
         <Button
           v-else-if="user?.type === 'patient'"
           class="w-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow-md"
+          @click="() =>
+            router.push('/generation')"
         >
           Ir a la generación libre
         </Button>
