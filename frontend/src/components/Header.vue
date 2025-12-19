@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { Calendar, Home, ChevronDown, BookOpenCheck  } from 'lucide-vue-next'
+import { Calendar, Home, ChevronDown, BookImage, Bookmark } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarProvider,
@@ -73,11 +73,13 @@ const ensureUTCString = (dateString: string) => {
 
 const formatLocalDate = (utcString: string) => {
   if (!utcString) return 'N/D'
-  return new Date(ensureUTCString(utcString)).toLocaleString('es-ES', {
-    timeZone: 'Europe/Madrid',
-    dateStyle: 'short',
-    timeStyle: 'short'
-  })
+  const date = new Date(ensureUTCString(utcString))
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear()).slice(-2)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${year}, ${hours}:${minutes}`
 }
 
 const getDateOnly = (utcString: string): string => {
@@ -86,11 +88,13 @@ const getDateOnly = (utcString: string): string => {
 }
 
 const sortedAndNumberedSessions = computed(() => {
-  const sorted = [...mySessions.value].sort((a, b) => {
-    const dateA = new Date(ensureUTCString(a.start_date)).getTime()
-    const dateB = new Date(ensureUTCString(b.start_date)).getTime()
-    return dateA - dateB
-  })
+  const sorted = [...mySessions.value]
+    .filter(s => s.ended_at != null)  // Only show completed sessions
+    .sort((a, b) => {
+      const dateA = new Date(ensureUTCString(a.start_date)).getTime()
+      const dateB = new Date(ensureUTCString(b.start_date)).getTime()
+      return dateA - dateB
+    })
   
   // Group by date
   const dateMap = new Map<string, any[]>()
@@ -102,14 +106,14 @@ const sortedAndNumberedSessions = computed(() => {
     dateMap.get(dateKey)!.push(s)
   })
   
-  // Flatten and add session number only if multiple sessions on same date
+  // Flatten and add start time for all sessions
   const result: any[] = []
   dateMap.forEach((sessions, dateStr) => {
-    const hasMultiple = sessions.length > 1
-    sessions.forEach((s, idx) => {
+    sessions.forEach((s) => {
+      const startTime = formatLocalDate(s.start_date).slice(10, 16)
       result.push({
         ...s,
-        sessionNumber: hasMultiple ? idx + 1 : null,
+        startTime: startTime,
         dateStr: dateStr
       })
     })
@@ -165,10 +169,11 @@ onMounted(async () => {
           </SidebarGroup>
 
           <!-- Collapsible Sessions group -->
-          <SidebarGroup class="-mt-2">
+          <SidebarGroup class="-mt-4">
             <SidebarGroupLabel>
-              <button class="flex w-full items-center justify-between rounded-md px-2 py-1 hover:bg-gray-100" @click="sessionsOpen = !sessionsOpen">
-                <span>Sessions</span>
+              <button class="flex w-full items-center gap-2 text-sm hover:bg-gray-100 rounded-md py-1.5" @click="sessionsOpen = !sessionsOpen">
+                <Bookmark class="h-4 w-4" />
+                <span class="flex-1 text-left">Sessions</span>
                 <ChevronDown :class="['h-4 w-4 transition-transform', sessionsOpen ? 'rotate-180' : 'rotate-0']" />
               </button>
             </SidebarGroupLabel>
@@ -183,8 +188,8 @@ onMounted(async () => {
                     }"
                   >
                     <a :href="`/session/${s.id}`">
-                      <BookOpenCheck />
-                      <span>{{ `Sesión${s.sessionNumber ? ` ${s.sessionNumber}` : ''} ${s.dateStr}` }}</span>
+                      <BookImage  />
+                      <span>{{ `Sesión ${s.dateStr} ${s.startTime}` }}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
