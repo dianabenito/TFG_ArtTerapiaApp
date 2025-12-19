@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Calendar, Home } from 'lucide-vue-next'
+import { computed, ref, onMounted } from 'vue'
+import { Calendar, Home, ChevronDown, BookOpenCheck  } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarProvider,
@@ -24,6 +24,8 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 
 import mainBg from '@/assets/utils/fondo_app.jpg'
+import { sessionsService } from '../api/sessionsService.js'
+import { userService } from '../api/userService.js'
 
 const items = [
   {
@@ -37,6 +39,10 @@ const items = [
     icon: Calendar,
   },
 ]
+
+const sessionsOpen = ref(false)
+const user = ref(null)
+const mySessions = ref<Array<any>>([])
 
 const bgStyle = computed(() => ({
   backgroundImage: `url(${mainBg})`,
@@ -56,6 +62,77 @@ const headerStyle = computed(() => ({
   backgroundSize: 'cover',
   backgroundPosition: 'bottom center',
 }))
+
+const ensureUTCString = (dateString: string) => {
+  if (!dateString) return dateString
+  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+    return dateString + 'Z'
+  }
+  return dateString
+}
+
+const formatLocalDate = (utcString: string) => {
+  if (!utcString) return 'N/D'
+  return new Date(ensureUTCString(utcString)).toLocaleString('es-ES', {
+    timeZone: 'Europe/Madrid',
+    dateStyle: 'short',
+    timeStyle: 'short'
+  })
+}
+
+const getDateOnly = (utcString: string): string => {
+  if (!utcString) return ''
+  return formatLocalDate(utcString).slice(0, 8)
+}
+
+const sortedAndNumberedSessions = computed(() => {
+  const sorted = [...mySessions.value].sort((a, b) => {
+    const dateA = new Date(ensureUTCString(a.start_date)).getTime()
+    const dateB = new Date(ensureUTCString(b.start_date)).getTime()
+    return dateA - dateB
+  })
+  
+  // Group by date
+  const dateMap = new Map<string, any[]>()
+  sorted.forEach(s => {
+    const dateKey = getDateOnly(s.start_date)
+    if (!dateMap.has(dateKey)) {
+      dateMap.set(dateKey, [])
+    }
+    dateMap.get(dateKey)!.push(s)
+  })
+  
+  // Flatten and add session number only if multiple sessions on same date
+  const result: any[] = []
+  dateMap.forEach((sessions, dateStr) => {
+    const hasMultiple = sessions.length > 1
+    sessions.forEach((s, idx) => {
+      result.push({
+        ...s,
+        sessionNumber: hasMultiple ? idx + 1 : null,
+        dateStr: dateStr
+      })
+    })
+  })
+  return result
+})
+
+onMounted(async () => {
+  try {
+    user.value = await userService.getCurrentUser()
+  } catch (e) {
+    user.value = null
+  }
+  try {
+    const sessions = await sessionsService.getMySessions()
+    const list = Array.isArray((sessions as any)?.data)
+      ? (sessions as any).data
+      : (Array.isArray(sessions) ? (sessions as any) : [])
+    mySessions.value = list
+  } catch (e) {
+    mySessions.value = []
+  }
+})
 
 </script>
 
@@ -82,6 +159,34 @@ const headerStyle = computed(() => ({
                     </a>
                   </SidebarMenuButton>
 
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <!-- Collapsible Sessions group -->
+          <SidebarGroup class="-mt-2">
+            <SidebarGroupLabel>
+              <button class="flex w-full items-center justify-between rounded-md px-2 py-1 hover:bg-gray-100" @click="sessionsOpen = !sessionsOpen">
+                <span>Sessions</span>
+                <ChevronDown :class="['h-4 w-4 transition-transform', sessionsOpen ? 'rotate-180' : 'rotate-0']" />
+              </button>
+            </SidebarGroupLabel>
+            <SidebarGroupContent v-show="sessionsOpen">
+              <SidebarMenu>
+                <SidebarMenuItem v-for="s in sortedAndNumberedSessions" :key="s.id">
+                  <SidebarMenuButton
+                    as-child
+                    :class="{
+                      'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === `/session/${s.id}`,
+                      'hover:bg-gray-300': route.path !== `/session/${s.id}`
+                    }"
+                  >
+                    <a :href="`/session/${s.id}`">
+                      <BookOpenCheck />
+                      <span>{{ `Sesión${s.sessionNumber ? ` ${s.sessionNumber}` : ''} ${s.dateStr}` }}</span>
+                    </a>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
