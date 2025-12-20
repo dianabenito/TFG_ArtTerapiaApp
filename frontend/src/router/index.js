@@ -15,6 +15,7 @@ const routes = [
   { path: '/home/', component: HomeView },
   { path: '/canvas/', component: CanvasView },
   { path: '/generation/', component: GenerationView },
+  { path: '/freeimages/', component: SessionView },
   // session-specific routes (use sessionId param)
   { path: '/session/:sessionId/patient', component: GenerationView, props: true },
   { path: '/session/:sessionId/patient/canvas', component: CanvasView, props: true },

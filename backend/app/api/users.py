@@ -40,3 +40,9 @@ async def login_access_token(db: SessionDep, form_data: Annotated[OAuth2Password
     OAuth2 compatible token login, get an access token for future requests
     """
     return crud.user.login_user(db=db, email=form_data.username, password=form_data.password)
+
+
+@router.get('/users/{user_id}/free-images', response_model=schemas.ImagesOut)
+async def get_images_for_user_no_session(db: SessionDep, user_id: int):
+    """Endpoint para que el usuario suba una imagen desde su galería."""
+    return crud.user.get_images_for_user_no_session(db=db, user_id=user_id)

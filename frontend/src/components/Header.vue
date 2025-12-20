@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { Calendar, Home, ChevronDown, BookImage, Bookmark } from 'lucide-vue-next'
+import { Calendar, Home, ChevronDown, BookImage, Bookmark, Folder, FileText, Users, Palette  } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarProvider,
@@ -12,6 +12,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarSeparator
 } from '@/components/ui/sidebar'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
@@ -145,7 +146,7 @@ onMounted(async () => {
     <SidebarProvider class="flex flex-1">
       <Sidebar class="bg-white">
         <SidebarContent>
-          <SidebarGroup>
+          <SidebarGroup class="!mb-0 !pb-0">
             <SidebarGroupLabel>ArteTerapia App</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -167,29 +168,55 @@ onMounted(async () => {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          <SidebarSeparator />
+          <SidebarGroup class="!mt-0 !pt-0">
+            <!-- BOTÓN PADRE -->
+            <SidebarMenuButton @click="sessionsOpen = !sessionsOpen">
+              <Bookmark class="h-4 w-4" />
+              <span>Sesiones</span>
+              <ChevronDown
+                class="ml-auto h-4 w-4 transition-transform"
+                :class="{ 'rotate-180': sessionsOpen }"
+              />
+            </SidebarMenuButton>
 
-          <!-- Collapsible Sessions group -->
-          <SidebarGroup class="-mt-4">
-            <SidebarGroupLabel>
-              <button class="flex w-full items-center gap-2 text-sm hover:bg-gray-100 rounded-md py-1.5" @click="sessionsOpen = !sessionsOpen">
-                <Bookmark class="h-4 w-4" />
-                <span class="flex-1 text-left">Sessions</span>
-                <ChevronDown :class="['h-4 w-4 transition-transform', sessionsOpen ? 'rotate-180' : 'rotate-0']" />
-              </button>
-            </SidebarGroupLabel>
-            <SidebarGroupContent v-show="sessionsOpen">
+            <!-- HIJOS -->
+            <div
+              v-show="sessionsOpen"
+              class="relative ml-4 pl-4 border-l border-slate-200 space-y-1"
+            >
+              <SidebarMenuButton
+                v-for="s in sortedAndNumberedSessions"
+                :key="s.id"
+                as-child
+                :class="{
+                  'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === `/session/${s.id}`,
+                  'hover:bg-gray-300': route.path !== `/session/${s.id}`
+                }"
+              >
+                <a :href="`/session/${s.id}`">
+                  <BookImage class="h-4 w-4" />
+                  <span>{{ `Sesión ${s.dateStr} ${s.startTime}` }}</span>
+                </a>
+              </SidebarMenuButton>
+            </div>
+          </SidebarGroup>
+
+          <SidebarSeparator v-if="user?.type === 'patient'" />
+          <SidebarGroup class="!mb-0 !pb-0">
+            <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem v-for="s in sortedAndNumberedSessions" :key="s.id">
+                <SidebarMenuItem v-if="user?.type === 'patient'">
                   <SidebarMenuButton
                     as-child
                     :class="{
-                      'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === `/session/${s.id}`,
-                      'hover:bg-gray-300': route.path !== `/session/${s.id}`
+                      'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === `/freeimages`,
+                      'hover:bg-gray-300': route.path !== `/freeimages`
                     }"
                   >
-                    <a :href="`/session/${s.id}`">
-                      <BookImage  />
-                      <span>{{ `Sesión ${s.dateStr} ${s.startTime}` }}</span>
+                    <a :href="`/freeimages`">
+                      <component :is="Palette" />
+                      <span>{{ "Imagénes de generación libre" }}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

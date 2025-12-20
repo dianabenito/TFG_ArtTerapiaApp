@@ -161,7 +161,7 @@
   "16": {
     "inputs": {
       "seed": 850858518826195,
-      "steps": 3,
+      "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
       "scheduler": "simple",

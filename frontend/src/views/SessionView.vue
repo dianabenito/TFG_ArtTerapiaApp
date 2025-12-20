@@ -53,52 +53,83 @@ onMounted(async () => {
     try {
       sessionInfo.value = await sessionsService.getSession(sessionId)
       console.log('Sesión obtenida:', sessionInfo.value)
+
+        // obtener usuario actual y validar pertenencia a la sesión
+      let authorized = true
+      try {
+        active_user.value = await userService.getCurrentUser()
+      } catch (e) {
+        authorized = false
+      }
+
+      try {
+        const patientId = sessionInfo.value?.patient_id ?? sessionInfo.value?.patient?.id
+        const therapistId = sessionInfo.value?.therapist_id ?? sessionInfo.value?.therapist?.id
+        authorized = authorized && !!active_user.value && (active_user.value.id === patientId || active_user.value.id === therapistId)
+      } catch (e) {
+        authorized = false
+      }
+
+      if (!authorized) {
+        showUnauthorizedDialog.value = true
+        isLoadingImages.value = false
+        return
+      }
+
+      try {
+        images.value = await sessionsService.getImagesForSession(sessionId)
+        images.value = images.value.data ?? images.value.images ?? []
+        // Filtrar solo imágenes generadas
+        images.value = images.value.filter(img => img.fileName?.startsWith('generated'))
+        console.log('Imágenes de la sesión:', images.value)
+      } catch (err) {
+        console.warn('No se pudieron obtener las imágenes:', err)
+      } finally {
+        isLoadingImages.value = false
+      }
     } catch (err) {
       console.warn('No se pudo obtener la sesión:', err)
     }
-  }
+    try{
+      if(active_user.value.type === 'therapist'){
+        another_user.value = await userService.getUserById(sessionInfo.value.patient_id)
+      } else if(active_user.value.type === 'patient'){
+        another_user.value = await userService.getUserById(sessionInfo.value.therapist_id)
+      }
 
-  // obtener usuario actual y validar pertenencia a la sesión
-  let authorized = true
-  try {
-    active_user.value = await userService.getCurrentUser()
-  } catch (e) {
-    authorized = false
-  }
-
-  try {
-    const patientId = sessionInfo.value?.patient_id ?? sessionInfo.value?.patient?.id
-    const therapistId = sessionInfo.value?.therapist_id ?? sessionInfo.value?.therapist?.id
-    authorized = authorized && !!active_user.value && (active_user.value.id === patientId || active_user.value.id === therapistId)
-  } catch (e) {
-    authorized = false
-  }
-
-  if (!authorized) {
-    showUnauthorizedDialog.value = true
-    isLoadingImages.value = false
-    return
-  }
-
-  try {
-    images.value = await sessionsService.getImagesForSession(sessionId)
-    images.value = images.value.data ?? images.value.images ?? []
-    console.log('Imágenes de la sesión:', images.value)
-  } catch (err) {
-    console.warn('No se pudieron obtener las imágenes:', err)
-  } finally {
-    isLoadingImages.value = false
-  }
-  
-  try{
-    if(active_user.value.type === 'therapist'){
-      another_user.value = await userService.getUserById(sessionInfo.value.patient_id)
-    } else if(active_user.value.type === 'patient'){
-      another_user.value = await userService.getUserById(sessionInfo.value.therapist_id)
     }
-  }
-  catch(e){
-    console.warn('No se pudo obtener el otro usuario de la sesión:', e)
+    catch(e){
+      console.warn('No se pudo obtener el otro usuario de la sesión:', e)
+    }
+  } else {
+    try {
+      let authorized = true
+      try{ 
+        active_user.value = await userService.getCurrentUser()
+      }
+      catch(e){
+        authorized = false
+      }
+      if (!active_user.value || active_user.value.type !== 'patient') {
+        authorized = false
+      }
+
+      if (!authorized) {
+        showUnauthorizedDialog.value = true
+        isLoadingImages.value = false
+        return
+      }
+      const response = await sessionsService.getImagesNoSession(active_user.value.id)
+      images.value = response.data ?? response.images ?? response ?? []
+      // Filtrar solo imágenes generadas
+      images.value = images.value.filter(img => img.fileName?.startsWith('generated'))
+      console.log('Imágenes sin sesión:', images.value)
+    } catch (err) {
+      console.warn('No se pudieron obtener las imágenes sin sesión:', err)
+      images.value = []
+    } finally {
+      isLoadingImages.value = false
+    }
   }
 })
 
@@ -145,7 +176,7 @@ const formatLocalDate = (utcString) => {
         <AlertDialogHeader>
           <AlertDialogTitle>Acceso no autorizado</AlertDialogTitle>
           <AlertDialogDescription>
-            No formas parte de esta sesión. Serás redirigido al inicio.
+            No tienes acceso a esta biblioteca. Serás redirigido al inicio.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -187,28 +218,25 @@ const formatLocalDate = (utcString) => {
     <!-- CONTENIDO -->
     <div class="bg-slate-300/30 min-h-[calc(100vh-4rem)] py-6">
       <!-- ESTE es el contenedor REAL -->
-      <div class="relative mx-auto w-full max-w-4xl px-6 space-y-6">
+      <div class="relative mx-auto w-full max-w-3xl px-6 space-y-6">
 
         <!-- HEADER (sin padding propio) -->
         <div class="flex items-start justify-between gap-4">
           <div class="space-y-1">
             <h1 class="text-2xl font-semibold text-slate-900">
-              Sesión {{ formatLocalDate(sessionInfo?.start_date).slice(0, 8) }}
+              {{ sessionId ? "Sesión " + formatLocalDate(sessionInfo?.start_date).slice(0, 8) : "Imágenes de generación libre" }} 
             </h1>
             <p class="text-sm text-slate-600">
-              {{ active_user?.type === 'therapist'
-                ? 'Consulta las imágenes generadas por el paciente'
-                : 'Consulta las imágenes que generaste'
-              }}
-              durante la sesión del día
-              {{ formatLocalDate(sessionInfo?.start_date).slice(0, 8) }}
-              en horario
-              {{ formatLocalDate(sessionInfo?.start_date).slice(10, 16) }} –
-              {{ formatLocalDate(sessionInfo?.end_date).slice(10, 16) }}.
+              <span v-if="sessionId">
+                {{ active_user?.type === 'therapist' ? 'Consulta las imágenes generadas por el paciente' : 'Consulta las imágenes que generaste' }}
+                durante la sesión del día {{ formatLocalDate(sessionInfo?.start_date).slice(0, 8) }}
+                en horario {{ formatLocalDate(sessionInfo?.start_date).slice(10, 16) }} – {{ formatLocalDate(sessionInfo?.end_date).slice(10, 16) }}.
+              </span>
+              <span v-else>Biblioteca de imágenes generadas</span>
             </p>
           </div>
 
-          <Button
+          <Button v-if="sessionId"
             variant="ghost"
             size="icon"
             class="!h-11 !w-11 rounded-xl shrink-0"
@@ -239,7 +267,7 @@ const formatLocalDate = (utcString) => {
             <CardContent class="space-y-3">
               <ImageIcon class="h-12 w-12 mx-auto opacity-50" />
               <p class="text-sm text-slate-600">
-                No hay imágenes registradas para esta sesión.
+                {{ sessionId ? "No hay imágenes generadas en esta sesión." : "No hay imágenes de generación libre registradas." }}
               </p>
             </CardContent>
           </Card>
