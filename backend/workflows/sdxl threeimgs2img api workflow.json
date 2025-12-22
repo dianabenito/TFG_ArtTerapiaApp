@@ -60,7 +60,7 @@
   },
   "6": {
     "inputs": {
-      "weight": 0.5,
+      "weight":  1,
       "weight_type": "linear",
       "combine_embeds": "concat",
       "start_at": 0,
@@ -251,7 +251,7 @@
   },
   "22": {
     "inputs": {
-      "text_positive": "",
+      "text_positive": "digital painting, expressive illustration, dreamlike atmosphere, emotional, calm mood, gentle details, artistic illustration, concept art style, not photorealistic, stylized",
       "text_negative": "ugly, photorealistic, hyperrealistic, ultra realistic, real photo, creepy, uncanny, watermark, horror, gore, sexualized, NSFW, epic, anxiety",
       "style_file": "basic.yaml",
       "template_name": "Digital Painting"

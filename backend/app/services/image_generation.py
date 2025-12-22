@@ -130,11 +130,11 @@ def generar_imagen(prompt_text: str, user_id: int, prompt_seed: Optional[int] = 
     if(input_img):
         with open(WORKFLOW_IMG2IMG_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
-            workflow["17"]["inputs"]["text_positive"] = prompt_text
+            workflow["17"]["inputs"]["text_positive"] = prompt_text + ", " +  workflow["17"]["inputs"]["text_positive"]
     else:
         with open(WORKFLOW_TXT2IMG_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
-            workflow["11"]["inputs"]["text_positive"] = prompt_text
+            workflow["11"]["inputs"]["text_positive"] = prompt_text + ", " +  workflow["11"]["inputs"]["text_positive"] 
 
     if(prompt_seed):
         seed = prompt_seed
@@ -236,7 +236,7 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
     translator= Translator(from_lang="es", to_lang="en")
     input_text = translator.translate(input_text)
 
-    workflow["199"]["inputs"]["text_positive"] = input_text 
+    workflow["199"]["inputs"]["text_positive"] = input_text + ", " + workflow["199"]["inputs"]["text_positive"]
     workflow["138"]["inputs"]["image"] = filename
     workflow["128"]["inputs"]["seed"] = seed
 
@@ -275,17 +275,57 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
 
 
 def publicar_imagen(upload_file):
-    os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
+    # Validar tipo de archivo
+    original_name = getattr(upload_file, 'filename', 'upload')
+    ext = os.path.splitext(original_name)[1].lower()
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Extensiones permitidas: {', '.join(allowed_extensions)}"
+        )
+    
+    # Leer contenido del archivo
+    file_content = upload_file.file.read()
+    
+    # Validar tamaño del archivo (máximo 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB en bytes
+    if len(file_content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo es demasiado grande. Tamaño máximo: 10MB"
+        )
+    
+    if len(file_content) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo está vacío"
+        )
+    
+    try:
+        os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear directorio de destino: {str(e)}"
+        )
 
     # create unique filename to avoid collisions
-    original_name = getattr(upload_file, 'filename', 'upload')
-    ext = os.path.splitext(original_name)[1] or '.png'
+    if not ext:
+        ext = '.png'
     filename = f"uploaded_{uuid.uuid4().hex}{ext}"
     destino_path = CARPETA_DESTINO_UPL / filename
 
     # write file contents
-    with open(destino_path, 'wb') as f:
-        f.write(upload_file.file.read())
+    try:
+        with open(destino_path, 'wb') as f:
+            f.write(file_content)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al guardar la imagen: {str(e)}"
+        )
 
     return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
 
@@ -347,13 +387,29 @@ def publicar_dibujo(upload_file):
 
 def obtener_imagenes_plantilla():
     try:
+        if not os.path.exists(CARPETA_TEMPLATES):
+            raise HTTPException(
+                status_code=404,
+                detail="El directorio de plantillas no existe"
+            )
+        
         files = [
             f for f in os.listdir(CARPETA_TEMPLATES)
             if os.path.isfile(os.path.join(CARPETA_TEMPLATES, f))
         ]
         return {"images": files}
+    except HTTPException:
+        raise
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al leer directorio de plantillas: {str(e)}"
+        )
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error inesperado al obtener plantillas: {str(e)}"
+        )
     
 
 def generate_image_by_mult_images(images: list, count: int, user_id: int) -> dict:
