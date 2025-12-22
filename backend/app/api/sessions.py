@@ -20,23 +20,23 @@ def create_session_for_patient(patient_id: int,
                                session: schemas.SessionCreate):
     if current_user.type != 'therapist':
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Only therapists can create sessions")
+                            detail="Solo los terapeutas pueden crear sesiones")
     patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
     if session.start_date >= session.end_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Start date must be before end date")
+                            detail="La fecha de inicio debe ser anterior a la fecha de fin")
     return crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
 
 @router.put("/session/{session_id}", response_model=schemas.Session)
 def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionDep, current_user: CurrentUser):
     db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not db_session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
     # Only therapist or patient may update the session
     if current_user.id not in (db_session.patient_id, db_session.therapist_id):
-        raise HTTPException(status_code=403, detail="Not allowed to update this session")
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar esta sesión")
 
     # Update fields if provided
     if session.start_date is not None:
@@ -47,7 +47,7 @@ def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionD
     # Validate dates after update
     if db_session.start_date >= db_session.end_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Start date must be before end date")
+                            detail="La fecha de inicio debe ser anterior a la fecha de fin")
 
     db.commit()
     db.refresh(db_session)
@@ -91,7 +91,7 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
         return session
 
     # Not found
-    raise HTTPException(status_code=404, detail="No active session")
+    raise HTTPException(status_code=404, detail="No hay sesión activa")
 
 
 @router.get('/next', response_model=schemas.Session)
@@ -135,11 +135,11 @@ def get_session_by_id(session_id: int, db: SessionDep, current_user: CurrentUser
     crud.session.finalize_expired_sessions(db, current_user.id)
     session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
 
     # Only patient or therapist may view the session
     if current_user.id not in (session.patient_id, session.therapist_id):
-        raise HTTPException(status_code=403, detail="Not allowed to view this session")
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver esta sesión")
 
     return session
 
@@ -152,9 +152,9 @@ async def end_session_by_id(session_id: int, db: SessionDep, current_user: Curre
     """
     session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
     if current_user.type != 'therapist' or current_user.id != session.therapist_id:
-        raise HTTPException(status_code=403, detail="Only the therapist for this session can end it")
+        raise HTTPException(status_code=403, detail="Solo el terapeuta de esta sesión puede finalizarla")
 
     updated = crud.session.end_session(db, session_id)
 
@@ -183,9 +183,9 @@ async def delete_session_by_id(session_id: int, db: SessionDep, current_user: Cu
     """
     session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
     if current_user.type != 'therapist' or current_user.id != session.therapist_id:
-        raise HTTPException(status_code=403, detail="Only the therapist for this session can delete it")
+        raise HTTPException(status_code=403, detail="Solo el terapeuta de esta sesión puede eliminarla")
 
     db.delete(session)
     db.commit()

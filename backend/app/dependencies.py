@@ -29,7 +29,7 @@ def get_current_user(
     user = crud.user.get_user(db, user_id=user_id)
     #user = db.get(models.User, token.sub)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
     return user
 
 CurrentUser = Annotated[models.User, Depends(get_current_user)]

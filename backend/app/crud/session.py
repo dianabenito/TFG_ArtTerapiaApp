@@ -39,7 +39,7 @@ def create_session_for_users(db: Session, patient_id: int, therapist_id: int, se
     therapist = db.query(models.Therapist).filter(models.Therapist.id == therapist_id).first()
 
     if not patient or not therapist:
-        raise HTTPException(status_code=404, detail="Patient or Therapist not found")  
+        raise HTTPException(status_code=404, detail="Paciente o Terapeuta no encontrado")  
     
     # assign start/end directly from Pydantic model (they are Optional[datetime])
     db_session = models.Session(
@@ -60,9 +60,9 @@ def end_session(db: Session, session_id: int):
     """
     db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not db_session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
     if db_session.ended_at is not None:
-        raise HTTPException(status_code=400, detail="Session already ended")
+        raise HTTPException(status_code=400, detail="La sesión ya ha finalizado")
     db_session.ended_at = datetime.utcnow()
     db.commit()
     db.refresh(db_session)
@@ -72,7 +72,7 @@ def get_images_for_session(db: Session, session_id: int):
     """Retrieve all images for a given session."""
     db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
     if not db_session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
     images = db.query(models.Image).filter(models.Image.session_id == session_id).all()
     return {
         "data": images,
