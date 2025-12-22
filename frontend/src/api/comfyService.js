@@ -6,8 +6,6 @@ export const comfyService = {
 
   async createImage(prompt, userId, sessionId = null) {
     try {
-      // log payload for easier debugging
-      console.debug('createImage payload:', prompt, 'sessionId:', sessionId)
       const url = sessionId 
         ? `${API_URL}/comfy/users/${userId}/images/?session_id=${sessionId}`
         : `${API_URL}/comfy/users/${userId}/images/`
@@ -44,7 +42,6 @@ export const comfyService = {
       console.log('generateImageByMultiple called with images:', images, 'and count:', count, 'sessionId:', sessionId)
       // backend expects { data: [{ fileName: '...' }, ...], count: N }
       const payload = { data: (images?.data ?? images).map(i => ({ fileName: i.fileName || i })), count }
-      console.debug('generateImageByMultiple payload:', payload)
       const url = sessionId 
         ? `${API_URL}/comfy/users/${userId}/multiple-images/?session_id=${sessionId}`
         : `${API_URL}/comfy/users/${userId}/multiple-images/`

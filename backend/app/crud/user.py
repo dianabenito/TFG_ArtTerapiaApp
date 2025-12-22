@@ -60,3 +60,15 @@ def validate_password_strength(password: str):
         raise HTTPException(status_code=400, detail="Password must contain at least one digit.")
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
         raise HTTPException(status_code=400, detail="Password must contain at least one special character.")
+
+def get_images_for_user_no_session(db: Session, user_id: int):
+    """Retrieve all images for a given user."""
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    images = db.query(models.Image).filter(models.Image.owner_id == user_id).filter(models.Image.session_id == None).all()
+    return {
+        "data": images,
+        "count": len(images)
+    }

@@ -136,7 +136,7 @@
   "16": {
     "inputs": {
       "seed": 546203926942417,
-      "steps": 3,
+      "steps": 30,
       "cfg": 6,
       "sampler_name": "dpmpp_2m_sde",
       "scheduler": "simple",
@@ -211,7 +211,7 @@
   "22": {
     "inputs": {
       "text_positive": "",
-      "text_negative": "ugly, watermark, NSFW",
+      "text_negative": "ugly, photorealistic, hyperrealistic, ultra realistic, real photo, creepy, uncanny, watermark, horror, gore, sexualized, NSFW, epic, anxiety",
       "style_file": "basic.yaml",
       "template_name": "Digital Painting"
     },

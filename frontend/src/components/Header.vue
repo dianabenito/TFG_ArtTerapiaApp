@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Calendar, Home } from 'lucide-vue-next'
+import { computed, ref, onMounted } from 'vue'
+import { Calendar, Home, ChevronDown, BookImage, Bookmark, Folder, FileText, Users, Palette  } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarProvider,
@@ -12,6 +12,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarSeparator
 } from '@/components/ui/sidebar'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
@@ -24,6 +25,8 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 
 import mainBg from '@/assets/utils/fondo_app.jpg'
+import { sessionsService } from '../api/sessionsService.js'
+import { userService } from '../api/userService.js'
 
 const items = [
   {
@@ -37,6 +40,10 @@ const items = [
     icon: Calendar,
   },
 ]
+
+const sessionsOpen = ref(false)
+const user = ref(null)
+const mySessions = ref<Array<any>>([])
 
 const bgStyle = computed(() => ({
   backgroundImage: `url(${mainBg})`,
@@ -57,6 +64,81 @@ const headerStyle = computed(() => ({
   backgroundPosition: 'bottom center',
 }))
 
+const ensureUTCString = (dateString: string) => {
+  if (!dateString) return dateString
+  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+    return dateString + 'Z'
+  }
+  return dateString
+}
+
+const formatLocalDate = (utcString: string) => {
+  if (!utcString) return 'N/D'
+  const date = new Date(ensureUTCString(utcString))
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear()).slice(-2)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${year}, ${hours}:${minutes}`
+}
+
+const getDateOnly = (utcString: string): string => {
+  if (!utcString) return ''
+  return formatLocalDate(utcString).slice(0, 8)
+}
+
+const sortedAndNumberedSessions = computed(() => {
+  const sorted = [...mySessions.value]
+    .filter(s => s.ended_at != null)  // Only show completed sessions
+    .sort((a, b) => {
+      const dateA = new Date(ensureUTCString(a.start_date)).getTime()
+      const dateB = new Date(ensureUTCString(b.start_date)).getTime()
+      return dateA - dateB
+    })
+  
+  // Group by date
+  const dateMap = new Map<string, any[]>()
+  sorted.forEach(s => {
+    const dateKey = getDateOnly(s.start_date)
+    if (!dateMap.has(dateKey)) {
+      dateMap.set(dateKey, [])
+    }
+    dateMap.get(dateKey)!.push(s)
+  })
+  
+  // Flatten and add start time for all sessions
+  const result: any[] = []
+  dateMap.forEach((sessions, dateStr) => {
+    sessions.forEach((s) => {
+      const startTime = formatLocalDate(s.start_date).slice(10, 16)
+      result.push({
+        ...s,
+        startTime: startTime,
+        dateStr: dateStr
+      })
+    })
+  })
+  return result
+})
+
+onMounted(async () => {
+  try {
+    user.value = await userService.getCurrentUser()
+  } catch (e) {
+    user.value = null
+  }
+  try {
+    const sessions = await sessionsService.getMySessions()
+    const list = Array.isArray((sessions as any)?.data)
+      ? (sessions as any).data
+      : (Array.isArray(sessions) ? (sessions as any) : [])
+    mySessions.value = list
+  } catch (e) {
+    mySessions.value = []
+  }
+})
+
 </script>
 
 <template>
@@ -64,7 +146,7 @@ const headerStyle = computed(() => ({
     <SidebarProvider class="flex flex-1">
       <Sidebar class="bg-white">
         <SidebarContent>
-          <SidebarGroup>
+          <SidebarGroup class="!mb-0 !pb-0">
             <SidebarGroupLabel>ArteTerapia App</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -82,6 +164,61 @@ const headerStyle = computed(() => ({
                     </a>
                   </SidebarMenuButton>
 
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarSeparator />
+          <SidebarGroup class="!mt-0 !pt-0">
+            <!-- BOTÓN PADRE -->
+            <SidebarMenuButton @click="sessionsOpen = !sessionsOpen">
+              <Bookmark class="h-4 w-4" />
+              <span>Sesiones</span>
+              <ChevronDown
+                class="ml-auto h-4 w-4 transition-transform"
+                :class="{ 'rotate-180': sessionsOpen }"
+              />
+            </SidebarMenuButton>
+
+            <!-- HIJOS -->
+            <div
+              v-show="sessionsOpen"
+              class="relative ml-4 pl-4 border-l border-slate-200 space-y-1"
+            >
+              <SidebarMenuButton
+                v-for="s in sortedAndNumberedSessions"
+                :key="s.id"
+                as-child
+                :class="{
+                  'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === `/session/${s.id}`,
+                  'hover:bg-gray-300': route.path !== `/session/${s.id}`
+                }"
+              >
+                <a :href="`/session/${s.id}`">
+                  <BookImage class="h-4 w-4" />
+                  <span>{{ `Sesión ${s.dateStr} ${s.startTime}` }}</span>
+                </a>
+              </SidebarMenuButton>
+            </div>
+          </SidebarGroup>
+
+          <SidebarSeparator v-if="user?.type === 'patient'" />
+          <SidebarGroup class="!mb-0 !pb-0">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem v-if="user?.type === 'patient'">
+                  <SidebarMenuButton
+                    as-child
+                    :class="{
+                      'bg-gray-500 text-white font-semibold hover:bg-gray-300': route.path === `/freeimages`,
+                      'hover:bg-gray-300': route.path !== `/freeimages`
+                    }"
+                  >
+                    <a :href="`/freeimages`">
+                      <component :is="Palette" />
+                      <span>{{ "Imagénes de generación libre" }}</span>
+                    </a>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>

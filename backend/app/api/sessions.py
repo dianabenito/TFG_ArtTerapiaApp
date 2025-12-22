@@ -190,3 +190,9 @@ async def delete_session_by_id(session_id: int, db: SessionDep, current_user: Cu
     db.delete(session)
     db.commit()
     return {"detail": "Session deleted successfully"}
+
+
+@router.get('/sessions/{session_id}/images', response_model=schemas.ImagesOut)
+async def get_images_for_session(db: SessionDep, session_id: int):
+    """Endpoint para que el usuario suba una imagen desde su galería."""
+    return crud.session.get_images_for_session(db=db, session_id=session_id)

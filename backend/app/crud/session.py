@@ -68,3 +68,13 @@ def end_session(db: Session, session_id: int):
     db.refresh(db_session)
     return db_session
 
+def get_images_for_session(db: Session, session_id: int):
+    """Retrieve all images for a given session."""
+    db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not db_session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    images = db.query(models.Image).filter(models.Image.session_id == session_id).all()
+    return {
+        "data": images,
+        "count": len(images)
+    }

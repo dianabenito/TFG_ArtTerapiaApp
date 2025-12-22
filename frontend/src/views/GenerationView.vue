@@ -44,6 +44,7 @@ const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
 const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
+const hasSession = Number.isFinite(sessionId)
 
 const chatMessages = ref([])       
 const newChatMessage = ref('')     
@@ -154,6 +155,7 @@ const connectWs = () => {
 }
 
 const clearPersistedState = () => {
+  if (!hasSession) return
   try {
     localStorage.removeItem(stateStorageKey)
     localStorage.removeItem(instructionsSeenKey)
@@ -163,6 +165,7 @@ const clearPersistedState = () => {
 }
 
 const persistState = () => {
+  if (!hasSession) return
   try {
     const payload = {
       imageUrl: imageUrl.value,
@@ -176,6 +179,7 @@ const persistState = () => {
 }
 
 const restoreState = () => {
+  if (!hasSession) return
   try {
     const raw = localStorage.getItem(stateStorageKey)
     if (!raw) return
@@ -194,7 +198,7 @@ const restoreState = () => {
 }
 
 onMounted(async () => {
-  restoreState()
+  if (hasSession) restoreState()
 
   // obtener info de sesión
   if (Number.isFinite(sessionId)) {
@@ -247,14 +251,16 @@ onMounted(async () => {
   }
 
   // mostrar instrucciones solo la primera vez en esta sesión
-  const alreadySeenInstructions = localStorage.getItem(instructionsSeenKey)
-  if (!alreadySeenInstructions) {
-    showInstructions.value = true
-    localStorage.setItem(instructionsSeenKey, '1')
+  if (hasSession) {
+    const alreadySeenInstructions = localStorage.getItem(instructionsSeenKey)
+    if (!alreadySeenInstructions) {
+      showInstructions.value = true
+      localStorage.setItem(instructionsSeenKey, '1')
+    }
   }
 })
 
-// persist local state when key pieces change
+// persist local state when key pieces change (solo con sessionId)
 watch(imageUrl, persistState)
 watch(showFinalView, persistState)
 watch(chatMessages, persistState, { deep: true })
@@ -308,11 +314,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     tempImageUrl.value = ''
 
     // Only accept numeric seeds; ignore click events or other objects
-    if (typeof last_seed === 'number') {
-      prompt.value.seed = last_seed
-    } else {
-      prompt.value.seed = null
-    }
+    prompt.value.seed = null
 
     console.log(inputImage)
 
@@ -398,7 +400,7 @@ const modalRegenerate = async () => {
   try {
     modalLoading.value = true
     // keep the same seed if present (pass the primitive value, not the ref)
-    const seedToUse = prompt.value.seed ?? null
+    const seedToUse = null
 
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
@@ -824,11 +826,13 @@ const ensureUTCString = (dateString) => {
 
 const formatLocalDate = (utcString) => {
   if (!utcString) return 'N/D';
-  return new Date(ensureUTCString(utcString)).toLocaleString('es-ES', {
-    timeZone: 'Europe/Madrid',
-    dateStyle: 'short',
-    timeStyle: 'short'
-  });
+  const date = new Date(ensureUTCString(utcString))
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = String(date.getFullYear()).slice(-2)
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 </script>
@@ -1097,7 +1101,7 @@ const formatLocalDate = (utcString) => {
         </div>
 
         <div class="flex justify-center">
-          <Button
+          <Button v-if="sessionId"
             size="lg"
             class="bg-green-600 hover:bg-green-700 text-white px-10 py-5 text-lg font-bold rounded-full shadow-lg shadow-green-600/30"
             @click="confirmFinalArtwork"

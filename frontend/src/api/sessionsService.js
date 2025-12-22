@@ -74,6 +74,22 @@ export const sessionsService = {
       { headers: { Authorization: `Bearer ${token}` } }
     )
     return response.data
+  },
+
+  async getImagesForSession(sessionId) {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/sessions/sessions/${sessionId}/images`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  async getImagesNoSession(userId) {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/users/users/${userId}/free-images`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
   }
 
 }
