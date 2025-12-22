@@ -314,11 +314,7 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     tempImageUrl.value = ''
 
     // Only accept numeric seeds; ignore click events or other objects
-    if (typeof last_seed === 'number') {
-      prompt.value.seed = last_seed
-    } else {
-      prompt.value.seed = null
-    }
+    prompt.value.seed = null
 
     console.log(inputImage)
 
@@ -404,7 +400,7 @@ const modalRegenerate = async () => {
   try {
     modalLoading.value = true
     // keep the same seed if present (pass the primitive value, not the ref)
-    const seedToUse = prompt.value.seed ?? null
+    const seedToUse = null
 
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
