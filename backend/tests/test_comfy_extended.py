@@ -10,7 +10,7 @@ def test_generate_with_seed(client, monkeypatch):
 
     called = {}
 
-    def fake_generar(prompt_text, prompt_seed=None, input_img=None):
+    def fake_generar(prompt_text, user_id, prompt_seed=None, input_img=None):
         # record the seed received and return a fake file
         called['seed'] = prompt_seed
         return {"message": "ok", "file": "fake_seed.png", "fullPath": "/tmp/fake_seed.png", "seed": prompt_seed}
@@ -33,7 +33,7 @@ def test_generate_from_existing_image(client, monkeypatch):
 
     recorded = {}
 
-    def fake_generar(prompt_text, prompt_seed=None, input_img=None):
+    def fake_generar(prompt_text, user_id, prompt_seed=None, input_img=None):
         # ensure input_img value is forwarded
         recorded['input_img'] = input_img
         return {"message": "ok", "file": "from_img.png", "fullPath": "/tmp/from_img.png", "seed": prompt_seed}
@@ -57,7 +57,7 @@ def test_regenerate_maintaining_seed_flow(client, monkeypatch):
 
     calls = []
 
-    def fake_generar(prompt_text, prompt_seed=None, input_img=None):
+    def fake_generar(prompt_text, user_id, prompt_seed=None, input_img=None):
         # first call: no seed provided -> produce seed 999
         if prompt_seed is None:
             calls.append(('first', None))
@@ -95,7 +95,7 @@ def test_generate_by_multiple_images_endpoint(client, monkeypatch):
 
     recorded = {}
 
-    def fake_mult(images_list, count=0):
+    def fake_mult(images_list, count, user_id):
         # ensure images_list is a list of dicts or filenames
         recorded['images'] = images_list
         recorded['count'] = count
@@ -128,7 +128,7 @@ def test_generate_with_invalid_seed_type(client, monkeypatch):
 def test_generate_from_existing_image_not_found(monkeypatch, client):
     # simulate service raising HTTPException when input image missing
     from fastapi import HTTPException
-    def fake_generar(prompt_text, prompt_seed=None, input_img=None):
+    def fake_generar(prompt_text, user_id, prompt_seed=None, input_img=None):
         raise HTTPException(status_code=400, detail="Imagen no encontrada")
 
     monkeypatch.setattr(imgsvc, 'generar_imagen', fake_generar)
@@ -150,7 +150,7 @@ def test_multiple_images_too_few_and_too_many(client, monkeypatch):
     uid = patient['id']
 
     # too few (1)
-    def fake_mult_validate(images_list, count=0):
+    def fake_mult_validate(images_list, count, user_id):
         if len(images_list) < 2 or len(images_list) > 4:
             from fastapi import HTTPException
             raise HTTPException(status_code=422, detail="Invalid number of images")
@@ -191,7 +191,7 @@ def test_generate_sketch_image_success(client, monkeypatch):
 
     recorded = {}
 
-    def fake_convertir_boceto(input_img, input_text):
+    def fake_convertir_boceto(input_img, input_text, user_id):
         recorded['input_img'] = input_img
         recorded['input_text'] = input_text
         return {
@@ -249,7 +249,7 @@ def test_generate_sketch_image_empty_text(client, monkeypatch):
     patient = next(u for u in users if u['email'] == 'patient@example.com')
     uid = patient['id']
 
-    def fake_convertir_boceto(input_img, input_text):
+    def fake_convertir_boceto(input_img, input_text, user_id):
         if not input_text or input_text.strip() == "":
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="El texto no puede estar vacío")
@@ -269,7 +269,7 @@ def test_generate_sketch_image_invalid_image_url(client, monkeypatch):
     patient = next(u for u in users if u['email'] == 'patient@example.com')
     uid = patient['id']
 
-    def fake_convertir_boceto(input_img, input_text):
+    def fake_convertir_boceto(input_img, input_text, user_id):
         # Simulate image not found
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Imagen de boceto no encontrada")
@@ -369,7 +369,7 @@ def test_sketch_to_image_service_error(client, monkeypatch):
     patient = next(u for u in users if u['email'] == 'patient@example.com')
     uid = patient['id']
 
-    def fake_convertir_boceto(input_img, input_text):
+    def fake_convertir_boceto(input_img, input_text, user_id):
         # Simulate internal service error using HTTPException
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail="ComfyUI service unavailable")
@@ -392,7 +392,7 @@ def test_sketch_preserves_seed_in_db(client, monkeypatch):
     patient = next(u for u in users if u['email'] == 'patient@example.com')
     uid = patient['id']
 
-    def fake_convertir_boceto(input_img, input_text):
+    def fake_convertir_boceto(input_img, input_text, user_id):
         return {
             "message": "ok",
             "file": "generated_from_sketch_999.png",
