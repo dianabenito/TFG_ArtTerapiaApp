@@ -1,13 +1,16 @@
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import hashlib
 import logging
 import bcrypt
 
 _log = logging.getLogger(__name__)
 
-SECRET_KEY = "supersecretkey123456"
+SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
