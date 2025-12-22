@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Image as ImageIcon, FolderOpen, Brush } from 'lucide-vue-next'
 
+
 const props = defineProps<{
   open: boolean
   loading: boolean
@@ -14,6 +15,7 @@ const props = defineProps<{
   activeTab: string
   isLoadingGallery: boolean
   uploadFileName?: string | null
+  selectedGallerySketchName?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -22,8 +24,10 @@ const emit = defineEmits<{
   (e: 'update:activeTab', v: string): void
   (e: 'fileChange', file: File): void
   (e: 'uploadAndTransform'): void
+  (e: 'openDrawnGallery'): void
   (e: 'drawSketch'): void
   (e: 'confirm'): void
+  (e: 'convertDrawnSketch'): void
 }>()
 
 const onFile = (ev: Event) => {
@@ -39,7 +43,7 @@ const onFile = (ev: Event) => {
       <DialogHeader>
         <DialogTitle>Generar obra a partir de un esbozo</DialogTitle>
         <DialogDescription>
-          Sube un esbozo desde tu biblioteca o dibujalo en el editor, y añade una descripción para transformar el esbozo en una nueva obra.
+          Sube un esbozo desde tu biblioteca o dibújalo en el editor, y añade una descripción para transformar el esbozo en una nueva obra.
         </DialogDescription>
       </DialogHeader>
 
@@ -49,6 +53,7 @@ const onFile = (ev: Event) => {
             <TabsList class="mx-auto mb-3">
               <TabsTrigger value="upload">Subir boceto</TabsTrigger>
               <TabsTrigger value="draw">Dibujar boceto</TabsTrigger>
+              <TabsTrigger value="gallery">Escoger de la galería</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload">
@@ -89,6 +94,28 @@ const onFile = (ev: Event) => {
                 </Button>
               </div>
             </TabsContent>
+            <TabsContent value="gallery">
+              <div class="grid gap-2">
+                <Label>Paso 1: Escoge un boceto de la galería de bocetos:</Label>
+                <div class="flex items-center gap-3">
+                  <Button variant="default" class="px-4 py-2 w-fit mt-1" @click="emit('openDrawnGallery')" :disabled="isLoadingGallery">Ver galería</Button>
+                  <span v-if="selectedGallerySketchName" class="text-sm text-muted-foreground truncate max-w-xs">{{ selectedGallerySketchName }}</span>
+                  <span v-else class="text-sm text-muted-foreground">Ningún boceto seleccionado</span>
+                </div>
+              </div>
+
+              <div class="h-px bg-border my-4" v-if="selectedGallerySketchName" />
+
+              <div class="grid gap-2" v-if="selectedGallerySketchName">
+                <Label for="promptText" class="leading-normal">Paso 2: Describe la obra que quieres crear a partir de la imagen seleccionada:</Label>
+                <Textarea id="promptText" :model-value="promptText" placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
+              </div>
+
+              <div class="flex justify-end mt-3">
+                <Button v-if="selectedGallerySketchName" variant="default" class="px-4 py-2" @click="emit('convertDrawnSketch')" :disabled="loading || !promptText?.trim()">{{ loading ? 'Generando...' : 'Convertir la imagen con texto' }}</Button>
+              </div>
+            </TabsContent>
+            
           </Tabs>
         </div>
 

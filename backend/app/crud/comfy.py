@@ -72,14 +72,14 @@ def create_user_sketch_image(db: Session, prompt: schemas.SketchPrompt, user_id:
         )
 
 
-def create_user_uploaded_image(db: Session, upload_file, user_id: int):
+def create_user_uploaded_image(db: Session, upload_file, user_id: int, isDrawn: bool = False):
     """Save an uploaded file to the generated_images folder and create DB record."""
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user or db_user.type != 'patient':
         raise HTTPException(status_code=404, detail="Los terapeutas no pueden tener imágenes o usuario no encontrado")
 
     try:
-        image = services.image_generation.publicar_imagen(upload_file)
+        image = services.image_generation.publicar_imagen(upload_file, isDrawn=isDrawn)
 
         # create DB record
         db_image = models.Image(fileName=image["file"], seed = image["seed"], owner_id=user_id)

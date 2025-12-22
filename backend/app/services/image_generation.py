@@ -215,6 +215,8 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
 
     origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
 
+    print(origin_path)
+
     # Validar que el archivo de origen exista
     if not origin_path.exists():
         raise HTTPException(
@@ -274,7 +276,7 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
         )
 
 
-def publicar_imagen(upload_file):
+def publicar_imagen(upload_file, isDrawn):
     # Validar tipo de archivo
     original_name = getattr(upload_file, 'filename', 'upload')
     ext = os.path.splitext(original_name)[1].lower()
@@ -314,7 +316,11 @@ def publicar_imagen(upload_file):
     # create unique filename to avoid collisions
     if not ext:
         ext = '.png'
-    filename = f"uploaded_{uuid.uuid4().hex}{ext}"
+
+    if isDrawn:
+        filename = f"uploaded_drawn_{uuid.uuid4().hex}{ext}"
+    else:
+        filename = f"uploaded_image_{uuid.uuid4().hex}{ext}"
     destino_path = CARPETA_DESTINO_UPL / filename
 
     # write file contents

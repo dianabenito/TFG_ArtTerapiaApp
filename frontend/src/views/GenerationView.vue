@@ -37,6 +37,7 @@ import GalleryDialog from '@/components/GalleryDialog.vue'
 import RefineModal from '@/components/RefineModal.vue'
 import ImagesModal from '@/components/ImagesModal.vue'
 import DrawModal from '@/components/DrawModal.vue'
+import DrawnGallery from '@/components/DrawnGallery.vue'
 import MultiImageModal from '@/components/MultiImageModal.vue'
 import { FolderOpen, Brush, Send, PenTool, ImageIcon, Layers, Loader2, Info, HelpCircle, PanelRightClose, MessageCircle } from 'lucide-vue-next'
 
@@ -51,12 +52,13 @@ const newChatMessage = ref('')
 const role = 'patient'
 
 const prompt = ref({ promptText: '', seed: null, inputImage: null })
-const sketchPrompt = ref({ sketchImage: '' })
+const sketchPrompt = ref({ sketchImage: '', sketchText: '' })
 const imageUrl = ref('')
 const tempImageUrl = ref('')
 const seedLastImg = ref(null)
 const uploadFile = ref(null)
 const selectedGalleryImageName = ref('')
+const selectedGallerySketchName = ref('')
 const active_user = ref(null)          // usuario actual
 const therapistUser = ref(null)        // terapeuta asociado a la sesión
 const isLoading = ref(false)
@@ -66,14 +68,18 @@ const isLoadingGallery = ref(true)
 const galleryImages = ref({
   templates: [],
   generated: [],
-  uploaded: []
+  uploaded: [],
+  uploadedDraws: [],
+  drawn : []
 })
 
 const combinedGallery = computed(() => {
   const t = galleryImages.value.templates ?? []
   const g = galleryImages.value.generated ?? []
   const u = galleryImages.value.uploaded ?? []
-  return [...t, ...g, ...u]
+  const ud = galleryImages.value.uploadedDraws ?? []
+  const d = galleryImages.value.drawn ?? []
+  return [...t, ...g, ...u, ...ud, ...d]
 })
 
 const showMultiSelectMode = ref(false)
@@ -83,6 +89,7 @@ const minMultiSelect = 2
 const maxMultiSelect = 4
 
 const showGallery = ref(false)
+const showdrawnGallery = ref(false)
 const chatOpen = ref(false)
 const showFinalView = ref(false)
 
@@ -520,6 +527,7 @@ const uploadUserImageandAddText = async () => {
     console.error(e)
   } finally {
     isLoading.value = false
+    prompt.value.promptText = ''
   }
 }
 
@@ -528,7 +536,7 @@ const uploadAndTransformSketch = async () => {
   try {
     isLoading.value = true
     active_user.value = await userService.getCurrentUser()
-    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
+    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id, true)
     console.log('Imagen subida:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
@@ -573,6 +581,7 @@ const openDrawModal = async () => {
   chatOpen.value = false
   tempImageUrl.value = ''
   showDrawModal.value = true
+  selectedGallerySketchName.value = ''
   modalLoading.value = false
   activeDrawTab.value = 'upload' // Reset to upload tab by default
 }
@@ -618,7 +627,9 @@ const loadGallery = async () => {
     const userImages = resp.data ?? resp.images ?? []
 
     const generated = userImages.filter(img => img.fileName.startsWith("generated"))
-    const uploaded = userImages.filter(img => img.fileName.startsWith("uploaded"))
+    const uploaded = userImages.filter(img => img.fileName.startsWith("uploaded_image"))
+    const uploadedDraws = userImages.filter(img => img.fileName.startsWith("uploaded_drawn"))
+    const drawn = userImages.filter(img => img.fileName.startsWith("drawn"))
 
     console.log("Imágenes del usuario:", generated, uploaded)
 
@@ -638,7 +649,9 @@ const loadGallery = async () => {
     galleryImages.value = {
       templates,
       generated,
-      uploaded
+      uploaded,
+      uploadedDraws,
+      drawn
     }
 
     console.log("Galería unificada:", galleryImages.value)
@@ -674,6 +687,14 @@ const selectImage = (img) => {
   showGallery.value = false
 }
 
+const selectDrawnImage = (img) => {
+  selectedGallerySketchName.value = img.fileName
+  seedLastImg.value = img.seed
+  toast.success("Imagen dibujada seleccionada de la galería")
+  console.log('Imagen dibujada seleccionada:', img.fileName)
+  showdrawnGallery.value = false
+}
+
 const openGalleryModal = () => {
   showMultiSelectMode.value = false
   selectedImages.value = []  
@@ -683,6 +704,17 @@ const openGalleryModal = () => {
   }
   showGallery.value = true
 }
+
+const openDrawnGalleryModal = () => {
+  showMultiSelectMode.value = false
+  selectedImages.value = []  
+  if (!galleryImages.value.drawn.length) {
+    toast.info('No hay imágenes dibujadas en tu galería')
+    return
+  }
+  showdrawnGallery.value = true
+}
+
 
 const openGalleryModalMultiselect = () => {
   chatOpen.value = false
@@ -833,6 +865,18 @@ const formatLocalDate = (utcString) => {
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${day}/${month}/${year}, ${hours}:${minutes}`;
+}
+
+// Handler para conversión de boceto seleccionado de la galería
+const convertDrawnSketch = async () => {
+  const imageUrl = ref('')
+  if (!selectedGallerySketchName.value) return
+  if (selectedGallerySketchName.value.startsWith('uploaded')) {
+    imageUrl.value = `${API_URL}/images/uploaded_images/${selectedGallerySketchName.value}`
+  } else {
+    imageUrl.value = `${API_URL}/images/drawn_images/${selectedGallerySketchName.value}`
+  }
+  await createFromSketch(imageUrl.value)
 }
 
 </script>
@@ -1198,13 +1242,19 @@ const formatLocalDate = (utcString) => {
       :isLoadingGallery="isLoadingGallery"
       :uploadFileName="uploadFile ? uploadFile.name : null"
       v-model:promptText="prompt.promptText"
+      :selectedGallerySketchName="selectedGallerySketchName"
       @update:open="handleDrawModalClose"
       @update:activeTab="(v) => (activeDrawTab = v)"
       @fileChange="onFileChange"
       @uploadAndTransform="uploadAndTransformSketch"
+      @openDrawnGallery="openDrawnGalleryModal"
       @drawSketch="drawSketch"
+      @convertDrawnSketch="convertDrawnSketch"
       @confirm="modalDrawConfirm"
+
+
     />
+
 
     <MultiImageModal
       :open="showMultiImageModal"
@@ -1242,6 +1292,21 @@ const formatLocalDate = (utcString) => {
       @toggle="toggleImageSelection"
       @confirm="confirmMultiSelect"
       @selectSingle="selectImage"
+    />
+
+    <!-- Galería modal en Dialog -->
+    <DrawnGallery
+      :open="showdrawnGallery"
+      :uploadedDraws="galleryImages.uploadedDraws"
+      :drawn="galleryImages.drawn"
+      :multiSelectMode="false"
+      :selectedImages="selectedImages"
+      :minMultiSelect="minMultiSelect"
+      :getImageUrl="getImageUrl"
+      @update:open="(v) => !v && (showdrawnGallery = false)"
+      @toggle="toggleImageSelection"
+      @confirm="confirmMultiSelect"
+      @selectSingle="selectDrawnImage"
     />
   
 
