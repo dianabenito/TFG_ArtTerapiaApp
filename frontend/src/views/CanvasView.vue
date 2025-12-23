@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService'
+import { sessionsService } from '../api/sessionsService'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Slider } from '@/components/ui/slider'
 import { Brush, Eraser, Trash2, Wand2, Loader2, Undo2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +40,7 @@ const modalLoading = ref(false)
 const sessionId = ref<number | null>(null)
 const history = ref<string[]>([])
 const hasDrawn = ref(false)
+const showAccessDeniedAlert = ref(false)
 
 const handleKeyDown = (e: KeyboardEvent) => {
   // Ctrl+Z (Windows/Linux) o Cmd+Z (Mac) para deshacer
@@ -38,7 +50,45 @@ const handleKeyDown = (e: KeyboardEvent) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // usuario actual
+  let currentUser = null
+  try {
+    currentUser = await userService.getCurrentUser()
+  } catch (e) {
+    console.warn('No se pudo obtener el usuario actual:', e)
+  }
+
+  // Si no hay usuario actual, redirigir al login (App.vue mostrará el alert global)
+  if (!currentUser) {
+    return
+  }
+
+  if (currentUser.type !== 'patient') {
+    showAccessDeniedAlert.value = true
+    return
+  }
+
+  // Comprobar que la sesión es la activa del paciente (si hay sessionId en la ruta)
+  const sid = Number(route.params.sessionId)
+  sessionId.value = Number.isFinite(sid) ? sid : null
+  if (Number.isFinite(sid)) {
+    try {
+      const sessionInfo = await sessionsService.getSession(sid)
+      if (currentUser.id !== sessionInfo?.patient_id) {
+        showAccessDeniedAlert.value = true
+        return
+      }
+      const activeSession = await sessionsService.getActiveSession()
+      if (!activeSession || activeSession.id !== sid) {
+        showAccessDeniedAlert.value = true
+        return
+      }
+    } catch (e) {
+      showAccessDeniedAlert.value = true
+      return
+    }
+  }
   if (canvas.value) {
     ctx.value = canvas.value.getContext('2d')
     
@@ -53,10 +103,7 @@ onMounted(() => {
 
   // Agregar listener para Ctrl+Z
   window.addEventListener('keydown', handleKeyDown)
-
-  // Capture sessionId from route params if present
-  const sid = Number(route.params.sessionId)
-  sessionId.value = Number.isFinite(sid) ? sid : null
+  
 })
 
 onBeforeUnmount(() => {
@@ -360,5 +407,22 @@ const modalConfirm = async () => {
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog :open="showAccessDeniedAlert" @update:open="(val) => showAccessDeniedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Acceso denegado</AlertDialogTitle>
+          <AlertDialogDescription>
+            No tienes acceso a este contenido.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="() => { router.push('/home'); }">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+
   </div>
 </template>

@@ -8,6 +8,7 @@ import app.crud as crud
 
 router = APIRouter()
 
+
 @router.get("/users/", response_model=List[schemas.User])
 async def read_users(db: SessionDep):
     users = crud.user.get_users(db)
@@ -20,8 +21,9 @@ def read_user_me(db: SessionDep, current_user: CurrentUser):
     """
     return current_user
 
+
 @router.get("/users/{user_id}", response_model=schemas.User)
-async def read_user(db: SessionDep, user_id: int):
+async def read_user(db: SessionDep, user_id: int, current_user: CurrentUser):
     db_user = crud.user.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -42,7 +44,8 @@ async def login_access_token(db: SessionDep, form_data: Annotated[OAuth2Password
     return crud.user.login_user(db=db, email=form_data.username, password=form_data.password)
 
 
+
 @router.get('/users/{user_id}/free-images', response_model=schemas.ImagesOut)
-async def get_images_for_user_no_session(db: SessionDep, user_id: int):
+async def get_images_for_user_no_session(db: SessionDep, user_id: int, current_user: CurrentUser):
     """Endpoint para que el usuario suba una imagen desde su galería."""
     return crud.user.get_images_for_user_no_session(db=db, user_id=user_id)

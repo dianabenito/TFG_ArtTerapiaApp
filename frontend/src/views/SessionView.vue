@@ -50,17 +50,15 @@ const API_URL = 'http://127.0.0.1:8000'
 onMounted(async () => {
   // obtener info de sesión
   if (Number.isFinite(sessionId)) {
+    let authorized = true
     try {
-      sessionInfo.value = await sessionsService.getSession(sessionId)
-      console.log('Sesión obtenida:', sessionInfo.value)
-
-        // obtener usuario actual y validar pertenencia a la sesión
-      let authorized = true
       try {
         active_user.value = await userService.getCurrentUser()
       } catch (e) {
-        authorized = false
+        return
       }
+      sessionInfo.value = await sessionsService.getSession(sessionId)
+      console.log('Sesión obtenida:', sessionInfo.value)
 
       try {
         const patientId = sessionInfo.value?.patient_id ?? sessionInfo.value?.patient?.id
@@ -70,11 +68,7 @@ onMounted(async () => {
         authorized = false
       }
 
-      if (!authorized) {
-        showUnauthorizedDialog.value = true
-        isLoadingImages.value = false
-        return
-      }
+      console.log('Usuario autorizado para ver la sesión:', authorized)
 
       try {
         images.value = await sessionsService.getImagesForSession(sessionId)
@@ -88,6 +82,7 @@ onMounted(async () => {
         isLoadingImages.value = false
       }
     } catch (err) {
+      authorized = false
       console.warn('No se pudo obtener la sesión:', err)
     }
     try{
@@ -99,8 +94,16 @@ onMounted(async () => {
 
     }
     catch(e){
+      authorized = false
       console.warn('No se pudo obtener el otro usuario de la sesión:', e)
     }
+    
+    if (!authorized) {
+      showUnauthorizedDialog.value = true
+      isLoadingImages.value = false
+      return
+    }
+
   } else {
     try {
       let authorized = true
@@ -109,6 +112,7 @@ onMounted(async () => {
       }
       catch(e){
         authorized = false
+        return
       }
       if (!active_user.value || active_user.value.type !== 'patient') {
         authorized = false
@@ -167,6 +171,8 @@ const formatLocalDate = (utcString) => {
 </script>
 <template>
   <div>
+
+
     <!-- DIÁLOGO DE NO AUTORIZADO -->
     <AlertDialog
       :open="showUnauthorizedDialog"

@@ -6,11 +6,12 @@ export const comfyService = {
 
   async createImage(prompt, userId, sessionId = null) {
     try {
+      const token = localStorage.getItem('token')
       const url = sessionId 
         ? `${API_URL}/comfy/users/${userId}/images/?session_id=${sessionId}`
         : `${API_URL}/comfy/users/${userId}/images/`
       const response = await axios.post(url, prompt, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       })
       return response.data
     } catch (err) {
@@ -22,12 +23,12 @@ export const comfyService = {
 
   async convertirBoceto(prompt, userId, sessionId = null) {
     try {
-
+      const token = localStorage.getItem('token')
       const url = sessionId 
         ? `${API_URL}/comfy/users/${userId}/sketch-images/?session_id=${sessionId}`
         : `${API_URL}/comfy/users/${userId}/sketch-images/`
       const response = await axios.post(url, prompt, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       })
       return response.data
     } catch (err) {
@@ -39,6 +40,7 @@ export const comfyService = {
 
   async generateImageByMultiple(images, count, userId, sessionId = null) {
     try {
+      const token = localStorage.getItem('token')
       console.log('generateImageByMultiple called with images:', images, 'and count:', count, 'sessionId:', sessionId)
       // backend expects { data: [{ fileName: '...' }, ...], count: N }
       const payload = { data: (images?.data ?? images).map(i => ({ fileName: i.fileName || i })), count }
@@ -46,7 +48,7 @@ export const comfyService = {
         ? `${API_URL}/comfy/users/${userId}/multiple-images/?session_id=${sessionId}`
         : `${API_URL}/comfy/users/${userId}/multiple-images/`
       const response = await axios.post(url, payload, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       })
       return response.data
     } catch (err) {
@@ -55,31 +57,40 @@ export const comfyService = {
     }
   },
 
+
   async uploadImage(file, userId, isDrawnImage = false) {
+    const token = localStorage.getItem('token')
     const form = new FormData()
     form.append('file', file)
     const url = `${API_URL}/comfy/users/${userId}/images/upload${isDrawnImage ? '?isDrawn=true' : ''}`
     const response = await axios.post(url, form, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
     })
     return response.data
   },
 
+
   async uploadDrawnImage(file, userId) {
+    const token = localStorage.getItem('token')
     const form = new FormData()
     form.append('file', file)
     const response = await axios.post(`${API_URL}/comfy/users/${userId}/images/drawn`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
     })
     return response.data
   },
 
+
   async getImagesForUser(userId) {
-    const response = await axios.get(`${API_URL}/comfy/users/${userId}/images`)
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/comfy/users/${userId}/images`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     return response.data
   },
 
   async getTemplateImages() {
+    // Las imágenes de plantilla pueden seguir siendo públicas si así lo deseas
     const response = await axios.get(`${API_URL}/comfy/template-images`)
     return response.data
   }

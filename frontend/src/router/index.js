@@ -10,7 +10,6 @@ import SessionView from '../views/SessionView.vue'
 
 const routes = [
   { path: '/', component: LoginView },
-  { path: '/therapist/', component: TherapistGenerationView },
   { path: '/signup/', component: SignupView },
   { path: '/home/', component: HomeView },
   { path: '/canvas/', component: CanvasView },

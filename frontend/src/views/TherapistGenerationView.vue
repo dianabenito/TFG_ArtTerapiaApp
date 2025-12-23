@@ -36,6 +36,7 @@ const showConfirmEndDialog = ref(false)
 const showSuccessEndDialog = ref(false)
 const showErrorEndDialog = ref(false)
 const showSessionAlreadyEndedAlert = ref(false)
+const showAccessDeniedAlert = ref(false)
 
 // Persistencia local por sesión para terapeuta
 const stateStorageKey = Number.isFinite(sessionId) ? `tgen_state_${sessionId}` : 'tgen_state_default'
@@ -122,7 +123,18 @@ onMounted(async () => {
   // Restaurar estado local si existe
   restoreState()
   if (!Number.isFinite(sessionId)) return
+  let currentUser = null
   try {
+    // comprobar que el usuario actual es el terapeuta de la sesión
+    try {
+      currentUser = await userService.getCurrentUser()
+    } catch (e) {
+      console.warn('No se pudo obtener el usuario actual:', e)
+    }
+    // Si no hay usuario actual, redirigir al login (App.vue mostrará el alert global)
+    if (!currentUser) {
+      return
+    }
     sessionInfo.value = await sessionsService.getSession(sessionId)
     if (sessionInfo.value?.ended_at) {
       clearPersistedState()
@@ -138,8 +150,24 @@ onMounted(async () => {
     } catch (e) {
       console.warn('No se pudo obtener datos del paciente:', e)
     }
+    if (currentUser.type !== 'therapist') {
+      showAccessDeniedAlert.value = true
+      return
+    }
+    if (currentUser.id !== sessionInfo.value?.therapist_id) {
+      showAccessDeniedAlert.value = true
+      return
+    }
+    // Comprobar que la sesión es la activa del terapeuta
+    const activeSession = await sessionsService.getActiveSession()
+    if (!activeSession || activeSession.id !== sessionId) {
+      showAccessDeniedAlert.value = true
+      return
+    }
   } catch (err) {
     console.warn('No se pudo obtener la sesión:', err)
+    showAccessDeniedAlert.value = true
+    return
   }
   connectSocket()
   setupSessionEndWatcher()
@@ -296,6 +324,24 @@ watch(chatMessages, persistState, { deep: true })
       </AlertDialogContent>
     </AlertDialog>
 
+    <AlertDialog :open="showAccessDeniedAlert" @update:open="(val) => showAccessDeniedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Acceso denegado</AlertDialogTitle>
+          <AlertDialogDescription>
+            No tienes acceso a este contenido.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="() => { router.push('/home'); }">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+
+
+
     <!-- DIÁLOGO DE DETALLES DE SESIÓN -->
     <Dialog :open="showDetails" @update:open="(val) => !val && (showDetails = false)">
       <DialogContent>
@@ -387,25 +433,6 @@ watch(chatMessages, persistState, { deep: true })
           </Button>
         </div>
       </div>
-    </div>
-
-    <!-- SESIÓN FINALIZADA -->
-    <div v-else class="min-h-[calc(100vh-4rem)]">
-      <AlertDialog :open="true" @update:open="(v) => { if (!v) router.push('/home') }">
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
-            <AlertDialogDescription>
-              La sesión ha sido cerrada. Puedes volver al inicio.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div class="flex justify-end">
-            <AlertDialogAction @click="router.push('/home')">
-              Volver al inicio
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   </div>
 </template>

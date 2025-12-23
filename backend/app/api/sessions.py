@@ -6,11 +6,14 @@ from app.dependencies import SessionDep, CurrentUser
 import app.crud as crud
 import app.models as models
 from datetime import datetime
+from sqlalchemy import and_, exists
+from sqlalchemy.orm import aliased
 
 router = APIRouter()
 
+
 @router.post("/session/{patient_id}/{therapist_id}", response_model=schemas.Session)
-def create_session(db: SessionDep, patient_id: int, therapist_id: int, session: schemas.SessionCreate):
+def create_session(db: SessionDep, patient_id: int, therapist_id: int, session: schemas.SessionCreate, current_user: CurrentUser):
     return crud.session.create_session_for_users(db=db, patient_id=patient_id, therapist_id=therapist_id, session=session)
 
 @router.post("/session/{patient_id}", response_model=schemas.Session)
@@ -51,12 +54,21 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
     now = datetime.utcnow()
     crud.session.finalize_expired_sessions(db, current_user.id)
     # First try as patient
+
+    S2 = aliased(models.Session)
     session = db.query(models.Session).filter(
         models.Session.patient_id == current_user.id,
         models.Session.start_date <= now,
         models.Session.end_date >= now,
         models.Session.ended_at == None,
-    ).first()
+        ~exists().where(and_(
+            S2.therapist_id == models.Session.therapist_id,
+            S2.start_date <= now,
+            S2.end_date >= now,
+            S2.ended_at == None,
+            S2.start_date < models.Session.start_date
+        ))
+    ).order_by(models.Session.start_date.asc()).first()
     if session:
         return session
 
@@ -66,7 +78,7 @@ def get_active_session(db: SessionDep, current_user: CurrentUser):
         models.Session.start_date <= now,
         models.Session.end_date >= now,
         models.Session.ended_at == None,
-    ).first()
+    ).order_by(models.Session.start_date.asc()).first()
     if session:
         return session
 
@@ -164,7 +176,8 @@ async def delete_session_by_id(session_id: int, db: SessionDep, current_user: Cu
     return crud.session.delete_session(db, session_id, current_user.id, current_user.type)
 
 
+
 @router.get('/sessions/{session_id}/images', response_model=schemas.ImagesOut)
-async def get_images_for_session(db: SessionDep, session_id: int):
+async def get_images_for_session(db: SessionDep, session_id: int, current_user: CurrentUser):
     """Endpoint para que el usuario suba una imagen desde su galería."""
     return crud.session.get_images_for_session(db=db, session_id=session_id)

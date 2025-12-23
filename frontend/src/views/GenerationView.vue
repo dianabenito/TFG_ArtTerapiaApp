@@ -96,7 +96,6 @@ const showFinalView = ref(false)
 const stateStorageKey = sessionId ? `gen_state_${sessionId}` : 'gen_state_default'
 const instructionsSeenKey = sessionId ? `gen_instr_${sessionId}` : 'gen_instr_default'
 
-
 // Tab control for draw modal
 const activeDrawTab = ref('upload')
 
@@ -110,6 +109,8 @@ const modalLoading = ref(false)
 const showDetails = ref(false)
 const showSessionEndedAlert = ref(false)
 const showSessionAlreadyEndedAlert = ref(false)
+const showAccessDeniedAlert = ref(false)
+const activeSession = ref(null)
 
 let ws = null
 let sessionEndTimeout = null
@@ -232,6 +233,28 @@ const setupSessionEndWatcher = () => {
 onMounted(async () => {
   if (hasSession) restoreState()
 
+  // usuario actual
+  let currentUser = null
+  try {
+    currentUser = await userService.getCurrentUser()
+    active_user.value = currentUser
+  } catch (e) {
+    console.warn('No se pudo obtener el usuario actual:', e)
+  }
+
+  
+  // Si no hay usuario actual, redirigir al login (App.vue mostrará el alert global)
+  if (!currentUser) {
+    return
+  }
+
+  // comprobar que el usuario actual es el paciente de la sesión
+  if (currentUser.type !== 'patient') {
+    showAccessDeniedAlert.value = true
+    return
+  }
+
+
   // obtener info de sesión
   if (Number.isFinite(sessionId)) {
     try {
@@ -243,26 +266,28 @@ onMounted(async () => {
       }
     } catch (err) {
       console.warn('No se pudo obtener la sesión:', err)
-      // Si la sesión no existe en backend, limpiar estado local relacionado
-      clearPersistedState()
     }
-  }
-
-  // usuario actual
-  try {
-    active_user.value = await userService.getCurrentUser()
-  } catch (e) {
-    console.warn('No se pudo obtener el usuario actual:', e)
-  }
-
-  // terapeuta asociado (para vista paciente)
-  try {
-    const therapistId = sessionInfo.value?.therapist_id ?? sessionInfo.value?.therapist?.id
-    if (role === 'patient' && therapistId) {
-      therapistUser.value = await userService.getUserById(therapistId)
+    
+    // comprobar que el usuario actual es el paciente de la sesión
+    if (currentUser.id !== sessionInfo.value?.patient_id) {
+      showAccessDeniedAlert.value = true
+      return
     }
-  } catch (e) {
-    console.warn('No se pudo obtener el terapeuta de la sesión:', e)
+
+    activeSession.value = await sessionsService.getActiveSession()
+    if(!activeSession.value || activeSession.value.id !== sessionId) {
+      showAccessDeniedAlert.value = true
+      return
+    }
+    // terapeuta asociado (para vista paciente)
+    try {
+      const therapistId = sessionInfo.value?.therapist_id ?? sessionInfo.value?.therapist?.id
+      if (role === 'patient' && therapistId) {
+        therapistUser.value = await userService.getUserById(therapistId)
+      }
+    } catch (e) {
+      console.warn('No se pudo obtener el terapeuta de la sesión:', e)
+    }
   }
 
   connectWs()
@@ -970,6 +995,24 @@ const convertDrawnSketch = async () => {
         </div>
       </AlertDialogContent>
     </AlertDialog>
+
+    <AlertDialog :open="showAccessDeniedAlert" @update:open="(val) => showAccessDeniedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Acceso denegado</AlertDialogTitle>
+          <AlertDialogDescription>
+            No tienes acceso a este contenido.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="() => { router.push('/home'); }">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+
+
 
     <Dialog
       :open="showInstructions"
