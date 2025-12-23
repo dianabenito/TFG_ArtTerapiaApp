@@ -35,6 +35,7 @@ const artworkConfirmed = ref(false)  // ← detecta si el paciente confirmó la 
 const showConfirmEndDialog = ref(false)
 const showSuccessEndDialog = ref(false)
 const showErrorEndDialog = ref(false)
+const showSessionAlreadyEndedAlert = ref(false)
 
 // Persistencia local por sesión para terapeuta
 const stateStorageKey = Number.isFinite(sessionId) ? `tgen_state_${sessionId}` : 'tgen_state_default'
@@ -91,6 +92,32 @@ const sendChatMessage = (text: string) => {
   persistState()
 }
 
+let sessionEndTimeout = null
+
+const setupSessionEndWatcher = () => {
+  if (!sessionInfo.value?.end_date) return
+
+  // Convertir a objeto Date en UTC correctamente
+  const endDate = new Date(ensureUTCString(sessionInfo.value.end_date))
+  const now = new Date()
+
+  // Si la sesión ya está finalizada, muestra el aviso inmediatamente
+  if (sessionInfo.value?.ended_at || endDate.getTime() <= now.getTime()) {
+    showSessionAlreadyEndedAlert.value = true
+    return
+  }
+
+  // Calcula el tiempo restante hasta el fin de la sesión
+  const msUntilEnd = endDate.getTime() - now.getTime()
+
+  if (msUntilEnd > 0) {
+    sessionEndTimeout = setTimeout(() => {
+      showSessionAlreadyEndedAlert.value = true
+      // Aquí puedes añadir lógica extra, como cerrar el websocket, redirigir, etc.
+    }, msUntilEnd)
+  }
+}
+
 onMounted(async () => {
   // Restaurar estado local si existe
   restoreState()
@@ -98,8 +125,8 @@ onMounted(async () => {
   try {
     sessionInfo.value = await sessionsService.getSession(sessionId)
     if (sessionInfo.value?.ended_at) {
-      // Sesión finalizada: limpiar estado persistido y salir
       clearPersistedState()
+      showSuccessEndDialog.value = true
       return
     }
     // obtener datos del paciente
@@ -115,9 +142,13 @@ onMounted(async () => {
     console.warn('No se pudo obtener la sesión:', err)
   }
   connectSocket()
+  setupSessionEndWatcher()
 })
 
-onBeforeUnmount(() => socket?.close())
+onBeforeUnmount(() => {
+  if (sessionEndTimeout) clearTimeout(sessionEndTimeout)
+  socket?.close()
+})
 
 const confirmEnd = async () => {
   if (!Number.isFinite(sessionId)) return
@@ -244,6 +275,22 @@ watch(chatMessages, persistState, { deep: true })
         <div class="flex justify-end">
           <AlertDialogAction @click="showErrorEndDialog = false">
             Cerrar
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="showSessionAlreadyEndedAlert" @update:open="(val) => showSessionAlreadyEndedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión ha finalizado.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="() => { clearPersistedState(); router.push('/home'); }">
+            Volver al inicio
           </AlertDialogAction>
         </div>
       </AlertDialogContent>

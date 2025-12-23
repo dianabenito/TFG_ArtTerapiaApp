@@ -3,6 +3,42 @@ from fastapi import HTTPException
 import app.models as models
 import app.schemas as schemas
 import app.services as services
+import os
+from pathlib import Path
+
+def update_session(db: Session, session_id: int, session_update: schemas.SessionUpdate, user_id: int):
+    db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not db_session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    # Only therapist or patient may update the session
+    if user_id not in (db_session.patient_id, db_session.therapist_id):
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar esta sesión")
+    # Update fields if provided
+    if session_update.start_date is not None:
+        db_session.start_date = session_update.start_date
+    if session_update.end_date is not None:
+        db_session.end_date = session_update.end_date
+    # Validate dates after update
+    if db_session.start_date >= db_session.end_date:
+        raise HTTPException(status_code=400, detail="La fecha de inicio debe ser anterior a la fecha de fin")
+    db.commit()
+    db.refresh(db_session)
+    return db_session
+
+def delete_session(db: Session, session_id: int, user_id: int, user_type: str):
+    db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
+    if not db_session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    if user_type != 'therapist' or user_id != db_session.therapist_id:
+        raise HTTPException(status_code=403, detail="Solo el terapeuta de esta sesión puede eliminarla")
+    db.delete(db_session)
+    db.commit()
+    return {"detail": "Session deleted successfully"}
+from sqlalchemy.orm import Session
+from fastapi import HTTPException
+import app.models as models
+import app.schemas as schemas
+import app.services as services
 from datetime import datetime
 
 

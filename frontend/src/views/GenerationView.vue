@@ -112,6 +112,7 @@ const showSessionEndedAlert = ref(false)
 const showSessionAlreadyEndedAlert = ref(false)
 
 let ws = null
+let sessionEndTimeout = null
 
 const connectWs = () => {
   const token = localStorage.getItem('token')
@@ -204,6 +205,30 @@ const restoreState = () => {
   }
 }
 
+const setupSessionEndWatcher = () => {
+  if (!sessionInfo.value?.end_date) return
+
+  // Convertir a objeto Date en UTC correctamente
+  const endDate = new Date(ensureUTCString(sessionInfo.value.end_date))
+  const now = new Date()
+
+  // Si la sesión ya está finalizada, muestra el aviso inmediatamente
+  if (sessionInfo.value?.ended_at || endDate.getTime() <= now.getTime()) {
+    showSessionAlreadyEndedAlert.value = true
+    return
+  }
+
+  // Calcula el tiempo restante hasta el fin de la sesión
+  const msUntilEnd = endDate.getTime() - now.getTime()
+
+  if (msUntilEnd > 0) {
+    sessionEndTimeout = setTimeout(() => {
+      showSessionAlreadyEndedAlert.value = true
+      // Aquí puedes añadir lógica extra, como cerrar el websocket, redirigir, etc.
+    }, msUntilEnd)
+  }
+}
+
 onMounted(async () => {
   if (hasSession) restoreState()
 
@@ -218,6 +243,8 @@ onMounted(async () => {
       }
     } catch (err) {
       console.warn('No se pudo obtener la sesión:', err)
+      // Si la sesión no existe en backend, limpiar estado local relacionado
+      clearPersistedState()
     }
   }
 
@@ -265,6 +292,8 @@ onMounted(async () => {
       localStorage.setItem(instructionsSeenKey, '1')
     }
   }
+
+  setupSessionEndWatcher()
 })
 
 // persist local state when key pieces change (solo con sessionId)
@@ -272,7 +301,10 @@ watch(imageUrl, persistState)
 watch(showFinalView, persistState)
 watch(chatMessages, persistState, { deep: true })
 
-onBeforeUnmount(() => ws?.close())
+onBeforeUnmount(() => {
+  if (sessionEndTimeout) clearTimeout(sessionEndTimeout)
+  ws?.close()
+})
 
 const sendChatMessage = () => {
   if (!newChatMessage.value || !ws || ws.readyState !== WebSocket.OPEN) return

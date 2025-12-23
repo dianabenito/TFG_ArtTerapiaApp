@@ -31,27 +31,7 @@ def create_session_for_patient(patient_id: int,
 
 @router.put("/session/{session_id}", response_model=schemas.Session)
 def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionDep, current_user: CurrentUser):
-    db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
-    if not db_session:
-        raise HTTPException(status_code=404, detail="Sesión no encontrada")
-    # Only therapist or patient may update the session
-    if current_user.id not in (db_session.patient_id, db_session.therapist_id):
-        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar esta sesión")
-
-    # Update fields if provided
-    if session.start_date is not None:
-        db_session.start_date = session.start_date
-    if session.end_date is not None:
-        db_session.end_date = session.end_date
-
-    # Validate dates after update
-    if db_session.start_date >= db_session.end_date:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="La fecha de inicio debe ser anterior a la fecha de fin")
-
-    db.commit()
-    db.refresh(db_session)
-    return db_session
+    return crud.session.update_session(db, session_id, session, current_user.id)
 
 @router.get('/my-sessions', response_model=schemas.SessionsOut)
 async def get_sessions_active_user(db: SessionDep, current_user: CurrentUser):
@@ -181,15 +161,7 @@ async def delete_session_by_id(session_id: int, db: SessionDep, current_user: Cu
     """
     Delete a session by id. Only the therapist of the session may perform this action.
     """
-    session = db.query(models.Session).filter(models.Session.id == session_id).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Sesión no encontrada")
-    if current_user.type != 'therapist' or current_user.id != session.therapist_id:
-        raise HTTPException(status_code=403, detail="Solo el terapeuta de esta sesión puede eliminarla")
-
-    db.delete(session)
-    db.commit()
-    return {"detail": "Session deleted successfully"}
+    return crud.session.delete_session(db, session_id, current_user.id, current_user.type)
 
 
 @router.get('/sessions/{session_id}/images', response_model=schemas.ImagesOut)

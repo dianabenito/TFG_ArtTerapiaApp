@@ -119,7 +119,6 @@ const handleSessionCreated = async () => {
   } catch (e) {
     activeSession.value = null
   }
-  
   try {
     nextSession.value = await sessionsService.getNextSession()
     if (nextSession.value) {
@@ -135,9 +134,10 @@ const handleSessionCreated = async () => {
   } catch (e) {
     nextSession.value = null
   }
-  
   await loadSessions()
   showCreateModal.value = false
+  // Forzar recarga completa de la página para refrescar Home
+  window.location.reload()
 }
 </script>
 
