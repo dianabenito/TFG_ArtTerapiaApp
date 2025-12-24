@@ -226,24 +226,6 @@ onMounted(async () => {
             <div class="flex items-center gap-4">
               <SidebarTrigger class="text-gray-700" />
               <Separator orientation="vertical" class="!h-4 hidden sm:block" />
- 
-              <!---
-              <Breadcrumb class="hidden sm:block">
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="#">Home</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="#">Dashboard</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>Panel</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            -->
             </div>
 
             <!-- PROFILE DROPDOWN -->

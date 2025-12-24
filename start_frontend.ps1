@@ -8,4 +8,4 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 cd frontend
 
 # Ejecutar el backend con Uvicorn
-npm run dev
+npm run dev -- --host 0.0.0.0

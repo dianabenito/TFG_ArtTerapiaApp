@@ -84,7 +84,7 @@ const setupSessionEndWatcher = (sessionInfo) => {
 const connectWs = (sessionId, role, sessionInfo) => {
   const token = localStorage.getItem('token')
   if (!token || !sessionId || sessionInfo?.ended_at) return
-  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
+  ws = new WebSocket(`ws://192.168.1.37:8000/ws/${sessionId}/${role}?token=${token}`)
   ws.onmessage = (ev) => {
     try {
       const obj = JSON.parse(ev.data)

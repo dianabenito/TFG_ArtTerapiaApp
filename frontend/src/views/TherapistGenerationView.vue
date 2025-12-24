@@ -28,7 +28,7 @@ const {
 } = useDateHelpers()
 
 
-const API_URL = 'http://127.0.0.1:8000'
+const API_URL = 'http://192.168.1.37:8000'
 const route = useRoute()
 const router = useRouter()
 const sessionId = Number(route.params.sessionId)
@@ -57,7 +57,7 @@ const connectSocket = () => {
 
   if (!Number.isFinite(sessionId)) return
 
-  socket = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
+  socket = new WebSocket(`ws://192.168.1.37:8000/ws/${sessionId}/${role}?token=${token}`)
 
   socket.onopen = () => console.log('Conectado al WS como terapeuta')
 

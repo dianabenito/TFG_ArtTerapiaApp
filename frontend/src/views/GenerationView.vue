@@ -48,7 +48,7 @@ const {
   formatLocalDate
 } = useDateHelpers()
 
-const API_URL = 'http://127.0.0.1:8000'
+const API_URL = 'http://192.168.1.37:8000'
 const route = useRoute()
 const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
@@ -141,7 +141,7 @@ const connectWs = () => {
   }
 
   // incluir token en query param para que el servidor lo valide
-  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
+  ws = new WebSocket(`ws://192.168.1.37:8000/ws/${sessionId}/${role}?token=${token}`)
 
   ws.onopen = () => console.log('WS conectado como paciente')
   ws.onmessage = (ev) => {
