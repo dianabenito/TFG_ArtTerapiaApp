@@ -68,15 +68,6 @@ const logout = () => {
 
       <DropdownMenuSeparator />
 
-      <DropdownMenuGroup>
-        <DropdownMenuItem class="px-4 py-2.5 text-base">
-          <UserIcon class="size-5" />
-          <span>Mi cuenta</span>
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
-
-      <DropdownMenuSeparator />
-
       <DropdownMenuItem class="px-4 py-2.5 text-base text-red-600" @click="logout()">
         <LogOutIcon class="size-5"/>
         <span>Cerrar Sesión</span>

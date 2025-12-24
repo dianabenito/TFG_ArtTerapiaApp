@@ -41,6 +41,13 @@ import DrawnGallery from '@/components/DrawnGallery.vue'
 import MultiImageModal from '@/components/MultiImageModal.vue'
 import { FolderOpen, Brush, Send, PenTool, ImageIcon, Layers, Loader2, Info, HelpCircle, PanelRightClose, MessageCircle } from 'lucide-vue-next'
 
+import { useDateHelpers } from '@/lib/useDateHelpers'
+
+const {
+  ensureUTCString,
+  formatLocalDate
+} = useDateHelpers()
+
 const API_URL = 'http://127.0.0.1:8000'
 const route = useRoute()
 const router = useRouter()
@@ -903,25 +910,6 @@ const drawSketch = async () => {
   } else {
     router.push('/canvas/')
   }
-}
-
-const ensureUTCString = (dateString) => {
-  if (!dateString) return dateString;
-  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
-    return dateString + 'Z';
-  }
-  return dateString;
-}
-
-const formatLocalDate = (utcString) => {
-  if (!utcString) return 'N/D';
-  const date = new Date(ensureUTCString(utcString))
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = String(date.getFullYear()).slice(-2)
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 // Handler para conversión de boceto seleccionado de la galería

@@ -32,6 +32,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+import { useDateHelpers } from '@/lib/useDateHelpers'
+
+const {
+  formatLocalDate
+} = useDateHelpers()
+
 const route = useRoute()
 const router = useRouter()
 const sessionId = Number(route.params.sessionId)
@@ -148,24 +154,6 @@ const getImageUrl = (fileName) => {
   } else {
     return `${API_URL}/images/template_images/${fileName}`
   }
-}
-
-const formatLocalDate = (utcString) => {
-  if (!utcString) return 'N/D';
-  const ensureUTCString = (dateString) => {
-    if (!dateString) return dateString
-    if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
-      return dateString + 'Z'
-    }
-    return dateString
-  }
-  const date = new Date(ensureUTCString(utcString))
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = String(date.getFullYear()).slice(-2)
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 </script>

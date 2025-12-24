@@ -201,7 +201,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { DateValue } from '@internationalized/date'
-import { DateFormatter, getLocalTimeZone, today, parseDate } from '@internationalized/date'
+import { DateFormatter, getLocalTimeZone, today } from '@internationalized/date'
+import { useDateHelpers } from '@/lib/useDateHelpers'
 import { CalendarIcon, AlertCircleIcon } from 'lucide-vue-next'
 import {
   Popover,
@@ -242,6 +243,14 @@ const defaultPlaceholder = today(getLocalTimeZone())
 const df = new DateFormatter('es-ES', {
   dateStyle: 'long',
 })
+const {
+  ensureUTCString,
+  formatLocalDate,
+  localToUTC,
+  dateToLocalString,
+  utcToLocalInput,
+  parseDate
+} = useDateHelpers()
 const showOverlapDialog = ref(false)
 const overlapAction = ref<null | (() => Promise<void>)>(null)
 const showCancelDialog = ref(false)
@@ -542,61 +551,7 @@ const closeUpdate = () => {
   selectedSession.value = null
 }
 
-// Helper: Asegura que un string UTC tenga 'Z' al final para interpretación correcta
-const ensureUTCString = (dateString) => {
-  if (!dateString) return dateString;
-  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
-    return dateString + 'Z';
-  }
-  return dateString;
-}
-
-const formatLocalDate = (utcString) => {
-  if (!utcString) return 'N/D';
-  const date = new Date(ensureUTCString(utcString))
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = String(date.getFullYear()).slice(-2)
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}/${month}/${year}, ${hours}:${minutes}`;
-}
-
-const localToUTC = (dateInput, timeStr) => {
-  // Si es un DateValue, convertir a string YYYY-MM-DD
-  const dateStr = dateInput?.toString ? dateInput.toString() : dateInput;
-  const date = new Date(`${dateStr}T${timeStr}:00`);
-  return date.toISOString();
-}
-
-// Convierte un UTC Date a string "YYYY-MM-DDTHH:mm:ss" (hora local, sin Z)
-// para que FullCalendar lo muestre sin desfase
-const dateToLocalString = (utcDate) => {
-  const year = utcDate.getFullYear();
-  const month = String(utcDate.getMonth() + 1).padStart(2, '0');
-  const day = String(utcDate.getDate()).padStart(2, '0');
-  const hours = String(utcDate.getHours()).padStart(2, '0');
-  const minutes = String(utcDate.getMinutes()).padStart(2, '0');
-  const seconds = String(utcDate.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-}
-
-const utcToLocalInput = (utcString) => {
-  const date = new Date(ensureUTCString(utcString));
-
-  const dateStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Madrid'
-  }).format(date);
-
-  const timeStr = new Intl.DateTimeFormat('es-ES', {
-    timeZone: 'Europe/Madrid',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(date);
-
-  return { date: dateStr, time: timeStr };
-};
+// ...existing code...
 
 </script>
 

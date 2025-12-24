@@ -187,6 +187,13 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'vue-sonner'
 
+import { useDateHelpers } from '@/lib/useDateHelpers'
+
+const {
+  ensureUTCString,
+  localToUTC
+} = useDateHelpers()
+
 interface Props {
   open: boolean
   patients: Array<{ id: number; full_name: string }>
@@ -214,20 +221,6 @@ watch(() => props.open, (newVal) => {
     resetForm()
   }
 })
-
-const ensureUTCString = (dateString: string) => {
-  if (!dateString) return dateString;
-  if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
-    return dateString + 'Z';
-  }
-  return dateString;
-}
-
-const localToUTC = (dateInput: any, timeStr: string) => {
-  const dateStr = dateInput?.toString ? dateInput.toString() : dateInput;
-  const date = new Date(`${dateStr}T${timeStr}:00`);
-  return date.toISOString();
-}
 
 const handleCreateSession = async () => {
   try {

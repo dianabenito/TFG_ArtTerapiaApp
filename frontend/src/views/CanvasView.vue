@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
+
 const route = useRoute()
 const router = useRouter()
 
@@ -41,6 +42,10 @@ const sessionId = ref<number | null>(null)
 const history = ref<string[]>([])
 const hasDrawn = ref(false)
 const showAccessDeniedAlert = ref(false)
+const showSessionEndedAlert = ref(false)
+const showSessionAlreadyEndedAlert = ref(false)
+let ws = null
+let sessionEndTimeout = null
 
 const handleKeyDown = (e: KeyboardEvent) => {
   // Ctrl+Z (Windows/Linux) o Cmd+Z (Mac) para deshacer
@@ -48,6 +53,55 @@ const handleKeyDown = (e: KeyboardEvent) => {
     e.preventDefault()
     undo()
   }
+}
+
+const setupSessionEndWatcher = (sessionInfo) => {
+  if (!sessionInfo?.end_date) return
+
+  // Convertir a objeto Date en UTC correctamente
+  let endDate = new Date(sessionInfo.end_date)
+  if (typeof sessionInfo.end_date === 'string' && !sessionInfo.end_date.endsWith('Z') && !sessionInfo.end_date.includes('+')) {
+    endDate = new Date(sessionInfo.end_date + 'Z')
+  }
+  const now = new Date()
+
+  // Si la sesión ya está finalizada, muestra el aviso inmediatamente
+  if (sessionInfo?.ended_at || endDate.getTime() <= now.getTime()) {
+    showSessionAlreadyEndedAlert.value = true
+    return
+  }
+
+  // Calcula el tiempo restante hasta el fin de la sesión
+  const msUntilEnd = endDate.getTime() - now.getTime()
+
+  if (msUntilEnd > 0) {
+    sessionEndTimeout = setTimeout(() => {
+      showSessionAlreadyEndedAlert.value = true
+    }, msUntilEnd)
+  }
+}
+
+const connectWs = (sessionId, role, sessionInfo) => {
+  const token = localStorage.getItem('token')
+  if (!token || !sessionId || sessionInfo?.ended_at) return
+  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}/${role}?token=${token}`)
+  ws.onmessage = (ev) => {
+    try {
+      const obj = JSON.parse(ev.data)
+      if (obj.event === 'chat_message') {
+        // ignore in canvas
+        return
+      }
+    } catch (e) {
+      const txt = String(ev.data)
+      if (txt === 'session_ended') {
+        showSessionEndedAlert.value = true
+        ws?.close()
+        return
+      }
+    }
+  }
+  ws.onclose = () => {}
 }
 
 onMounted(async () => {
@@ -84,6 +138,10 @@ onMounted(async () => {
         showAccessDeniedAlert.value = true
         return
       }
+      // --- NUEVO: watcher y ws ---
+      setupSessionEndWatcher(sessionInfo)
+      connectWs(sid, 'patient', sessionInfo)
+      // ---
     } catch (e) {
       showAccessDeniedAlert.value = true
       return
@@ -109,6 +167,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   // Remover listener al desmontar
   window.removeEventListener('keydown', handleKeyDown)
+  if (sessionEndTimeout) clearTimeout(sessionEndTimeout)
+  ws?.close()
 })
 
 const startDrawing = (e: MouseEvent) => {
@@ -418,6 +478,38 @@ const modalConfirm = async () => {
         </AlertDialogHeader>
         <div class="flex justify-end gap-3">
           <AlertDialogAction @click="() => { router.push('/home'); }">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+    
+    <AlertDialog :open="showSessionEndedAlert" @update:open="(val) => showSessionEndedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión ha sido finalizada por el terapeuta.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="router.push('/home')">
+            Volver al inicio
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="showSessionAlreadyEndedAlert" @update:open="(val) => showSessionAlreadyEndedAlert = val">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sesión finalizada</AlertDialogTitle>
+          <AlertDialogDescription>
+            La sesión ha finalizado.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="flex justify-end gap-3">
+          <AlertDialogAction @click="router.push('/home')">
             Volver al inicio
           </AlertDialogAction>
         </div>
