@@ -50,7 +50,7 @@ class ImagenHandler(FileSystemEventHandler):
     def on_created(self, event):
         nombre = os.path.basename(event.src_path)
         if nombre.startswith(self.prefijo) and nombre.lower().endswith((".png", ".jpg", ".jpeg")):
-            print(f"✅ Imagen detectada: {nombre}")
+            print(f"Imagen detectada: {nombre}")
             origen = event.src_path
 
             # Esperar a que el archivo esté completamente escrito
@@ -73,7 +73,7 @@ class ImagenHandler(FileSystemEventHandler):
 
             # Copiar la imagen
             shutil.copyfile(origen, destino)
-            print(f"📂 Imagen copiada a: {destino}")
+            print(f"Imagen copiada a: {destino}")
             self.archivo_encontrado = destino
 
 
@@ -94,7 +94,7 @@ def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
     observer.schedule(handler, CARPETA_ORIGEN, recursive=False)
     observer.start()
 
-    print(f"⏳ Esperando imagen con prefijo '{prefijo}' en {CARPETA_ORIGEN}...")
+    print(f"Esperando imagen con prefijo '{prefijo}' en {CARPETA_ORIGEN}...")  # Ya está en español
 
     start_time = time.time()
     while time.time() - start_time < timeout:
@@ -106,7 +106,7 @@ def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
 
     observer.stop()
     observer.join()
-    print("❌ Tiempo de espera agotado.")
+    print("Tiempo de espera agotado.")
     return None
 
 
@@ -143,7 +143,7 @@ def generar_imagen(prompt_text: str, user_id: int, prompt_seed: Optional[int] = 
 
     if(input_img):
         filename = input_img.rpartition('/')[-1]
-        print(f"Using input image: {filename}")
+        print(f"Usando imagen de entrada: {filename}")
 
         origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
 
@@ -154,7 +154,7 @@ def generar_imagen(prompt_text: str, user_id: int, prompt_seed: Optional[int] = 
                 detail=f"La imagen de entrada no existe: {filename}"
             )
 
-        print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+        print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
         destino_path = CARPETA_COMFY_INPUT / filename
         
         try:
@@ -189,7 +189,7 @@ def generar_imagen(prompt_text: str, user_id: int, prompt_seed: Optional[int] = 
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
-        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,
@@ -211,11 +211,9 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
     seed = random.randint(0, MAX_SQLITE_INT)
 
     filename = input_img.rpartition('/')[-1]
-    print(f"Using input image: {filename}")
+    print(f"Usando imagen de entrada: {filename}")
 
     origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
-
-    print(origin_path)
 
     # Validar que el archivo de origen exista
     if not origin_path.exists():
@@ -224,7 +222,7 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
             detail=f"La imagen de boceto no existe: {filename}"
         )
 
-    print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+    print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
     destino_path = CARPETA_COMFY_INPUT / filename
     
     try:
@@ -262,7 +260,7 @@ def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> di
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
-        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,
@@ -451,7 +449,7 @@ def generate_image_by_mult_images(images: list, count: int, user_id: int) -> dic
 
     for i in range(count):
         filename = images[i].fileName
-        print(f"Using input image: {filename}")
+        print(f"Usando imagen de entrada: {filename}")
         
         file_name = urlparse(images[i].fileName).path.lstrip("/")
 
@@ -464,7 +462,7 @@ def generate_image_by_mult_images(images: list, count: int, user_id: int) -> dic
 
         origin_path = folder / file_name
 
-        print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+        print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
         destino_path = CARPETA_COMFY_INPUT / filename
         shutil.copy(origin_path, destino_path)
         
@@ -494,7 +492,7 @@ def generate_image_by_mult_images(images: list, count: int, user_id: int) -> dic
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
-        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,

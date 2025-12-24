@@ -347,7 +347,6 @@ onMounted(async () => {
   await loadSessions()
   try {
     activeSession.value = await sessionsService.getActiveSession()
-    console.log('Active session:', activeSession.value)
   } catch (e) {
     activeSession.value = null
   }
@@ -505,8 +504,6 @@ const loadSessions = async () => {
   const sessions = await sessionsService.getMySessions();
   const list = Array.isArray(sessions?.data) ? sessions.data : (Array.isArray(sessions) ? sessions : []);
   sessionsList.value = list
-
-  console.log('Sesiones cargadas:', list);
 
   // Build event titles: for therapists show patient name + time, for patients show "Sesión"
   const eventTitles = await Promise.all(

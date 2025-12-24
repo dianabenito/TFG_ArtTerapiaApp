@@ -387,8 +387,6 @@ const generateImage = async (last_seed = null, inputImage = null) => {
     // Only accept numeric seeds; ignore click events or other objects
     prompt.value.seed = null
 
-    console.log(inputImage)
-
     if(inputImage) {
       prompt.value.inputImage = inputImage
     } else {
@@ -402,7 +400,6 @@ const generateImage = async (last_seed = null, inputImage = null) => {
 
     if (response.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
-      console.log('Modal image URL:', prompt)
       seedLastImg.value = response.seed
       // Refresh gallery to include the newly generated image
       try {
@@ -433,11 +430,9 @@ const createFromSketch = async(inputImage) => {
     const response = Number.isFinite(sessionId) 
       ? await comfyService.convertirBoceto(sketchPrompt.value, active_user.value.id, sessionId)
       : await comfyService.convertirBoceto(sketchPrompt.value, active_user.value.id)
-    console.log('Imagen generada:', response)
 
     if (response.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
-      console.log('Modal image URL:', prompt)
       seedLastImg.value = response.seed
       // Refresh gallery to include the newly generated image
       try {
@@ -475,7 +470,6 @@ const modalRegenerate = async () => {
 
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.createImage({ promptText: prompt.value.promptText, seed: seedToUse }, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
-    console.log('Modal regenerate:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${resp.file}`
       prompt.value.seed = resp.seed
@@ -544,7 +538,6 @@ const uploadUserImage = async () => {
     isLoading.value = true
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
-    console.log('Imagen subida:', resp)
     if (resp.file) {
       // tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
       seedLastImg.value = resp.seed
@@ -571,7 +564,6 @@ const uploadUserImageandAddText = async () => {
     isLoading.value = true
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
-    console.log('Imagen subida:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
       seedLastImg.value = resp.seed
@@ -601,7 +593,6 @@ const uploadAndTransformSketch = async () => {
     isLoading.value = true
     active_user.value = await userService.getCurrentUser()
     const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id, true)
-    console.log('Imagen subida:', resp)
     if (resp.file) {
       tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
       seedLastImg.value = resp.seed
@@ -695,8 +686,6 @@ const loadGallery = async () => {
     const uploadedDraws = userImages.filter(img => img.fileName.startsWith("uploaded_drawn"))
     const drawn = userImages.filter(img => img.fileName.startsWith("drawn"))
 
-    console.log("Imágenes del usuario:", generated, uploaded)
-
     // 2. Cargar imágenes de plantilla desde backend
     const tempResp = await comfyService.getTemplateImages()
     const templateNames = tempResp.images ?? []
@@ -707,8 +696,6 @@ const loadGallery = async () => {
       seed: null,
     }))
 
-    console.log("Imágenes de plantilla:", templates)
-
     // 3. Unificar
     galleryImages.value = {
       templates,
@@ -717,8 +704,6 @@ const loadGallery = async () => {
       uploadedDraws,
       drawn
     }
-
-    console.log("Galería unificada:", galleryImages.value)
 
   } catch (e) {
     console.error("Error cargando galería:", e)
@@ -747,7 +732,6 @@ const selectImage = (img) => {
   selectedGalleryImageName.value = img.fileName
   seedLastImg.value = img.seed
   toast.success("Imagen seleccionada de la galería")
-  console.log('Imagen seleccionada:', img.fileName)
   showGallery.value = false
 }
 
@@ -755,7 +739,6 @@ const selectDrawnImage = (img) => {
   selectedGallerySketchName.value = img.fileName
   seedLastImg.value = img.seed
   toast.success("Imagen dibujada seleccionada de la galería")
-  console.log('Imagen dibujada seleccionada:', img.fileName)
   showdrawnGallery.value = false
 }
 
@@ -827,7 +810,6 @@ const generateMultiImage = async () => {
 
     active_user.value = await userService.getCurrentUser()
     const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
-    console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
       tempImageUrl.value = `${API_URL}/images/generated_images/${response.file}`
@@ -864,7 +846,6 @@ const confirmMultiSelect = async () => {
   }
 
   // Aquí puedes enviar estas imágenes a tu flujo de Comfy
-  console.log('Imágenes seleccionadas para flujo Comfy:', selectedImages.value)
   showGallery.value = false
   multiSelectMode.value = false
   showMultiSelectMode.value = false
@@ -880,11 +861,9 @@ const confirmMultiSelect = async () => {
 
     active_user.value = await userService.getCurrentUser()
     const response = await comfyService.generateImageByMultiple(imagesPayload, selectedImages.value.length, active_user.value.id, Number.isFinite(sessionId) ? sessionId : null)
-    console.log('Imagen generada por múltiples imágenes:', response)
 
     if (response.file) {
       imageUrl.value = `${API_URL}/images/generated_images/${response.file}`
-      console.log('Imagen generada URL:', imageUrl.value)
       seedLastImg.value = response.seed
       // Refresh gallery to include the new image generated from multiple images
       try {

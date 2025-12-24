@@ -64,8 +64,6 @@ onMounted(async () => {
         return
       }
       sessionInfo.value = await sessionsService.getSession(sessionId)
-      console.log('Sesión obtenida:', sessionInfo.value)
-
       try {
         const patientId = sessionInfo.value?.patient_id ?? sessionInfo.value?.patient?.id
         const therapistId = sessionInfo.value?.therapist_id ?? sessionInfo.value?.therapist?.id
@@ -74,14 +72,11 @@ onMounted(async () => {
         authorized = false
       }
 
-      console.log('Usuario autorizado para ver la sesión:', authorized)
-
       try {
         images.value = await sessionsService.getImagesForSession(sessionId)
         images.value = images.value.data ?? images.value.images ?? []
         // Filtrar solo imágenes generadas
         images.value = images.value.filter(img => img.fileName?.startsWith('generated'))
-        console.log('Imágenes de la sesión:', images.value)
       } catch (err) {
         console.warn('No se pudieron obtener las imágenes:', err)
       } finally {
@@ -133,7 +128,6 @@ onMounted(async () => {
       images.value = response.data ?? response.images ?? response ?? []
       // Filtrar solo imágenes generadas
       images.value = images.value.filter(img => img.fileName?.startsWith('generated'))
-      console.log('Imágenes sin sesión:', images.value)
     } catch (err) {
       console.warn('No se pudieron obtener las imágenes sin sesión:', err)
       images.value = []

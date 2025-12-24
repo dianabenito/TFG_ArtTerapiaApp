@@ -41,7 +41,6 @@ export const comfyService = {
   async generateImageByMultiple(images, count, userId, sessionId = null) {
     try {
       const token = localStorage.getItem('token')
-      console.log('generateImageByMultiple called with images:', images, 'and count:', count, 'sessionId:', sessionId)
       // backend expects { data: [{ fileName: '...' }, ...], count: N }
       const payload = { data: (images?.data ?? images).map(i => ({ fileName: i.fileName || i })), count }
       const url = sessionId 

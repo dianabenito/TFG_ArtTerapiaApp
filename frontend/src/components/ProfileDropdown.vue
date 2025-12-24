@@ -33,7 +33,6 @@ const router = useRouter()
 onMounted(async () => {
   try {
     user.value = await userService.getCurrentUser()
-    console.log('Usuario actual:', user.value)
   } catch (error) {
     errorMsg.value = error.response?.data?.detail || 'No autenticado'
   }

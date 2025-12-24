@@ -37,7 +37,6 @@ const {
 onMounted(async () => {
   try {
     user.value = await userService.getCurrentUser()
-    console.log('Usuario actual:', user.value)
   } catch (error) {
     console.error('Error al obtener el usuario:', error)
     errorMsg.value = error.response?.data?.detail || 'No autenticado'
@@ -69,7 +68,6 @@ onMounted(async () => {
     if(!activeSession.value){
       // No hay sesión activa, obtener la próxima sesión programada
       nextSession.value = await sessionsService.getNextSession()
-      console.log('Próxima sesión:', nextSession.value)
       nextDate.value = formatLocalDate(nextSession.value.start_date).slice(0, 8)
       nextStartTime.value = formatLocalDate(nextSession.value.start_date).slice(10, 16)
       nextEndTime.value = formatLocalDate(nextSession.value.end_date).slice(10, 16)
