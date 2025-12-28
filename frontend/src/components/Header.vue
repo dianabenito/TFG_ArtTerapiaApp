@@ -136,7 +136,7 @@ onMounted(async () => {
       <Sidebar class="bg-white">
         <SidebarContent>
           <SidebarGroup class="!mb-0 !pb-0">
-            <SidebarGroupLabel>ArteTerapia App</SidebarGroupLabel>
+            <SidebarGroupLabel>ComfyMind</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem v-for="item in items" :key="item.title">

@@ -61,7 +61,7 @@ const handleSessionExpired = () => {
   router.push('/')
 }
 
-document.title = 'ArteTerapia App'
+document.title = 'ComfyMind'
 </script>
 
 <style>
