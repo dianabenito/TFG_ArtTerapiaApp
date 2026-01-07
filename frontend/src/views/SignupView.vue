@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import signupBg from '@/assets/utils/fondo_login.jpg'
-import logoImg from '@/assets/utils/logo.png'
+import logoImg from '/logo_comfymind.svg'
 import { AlertCircleIcon} from 'lucide-vue-next'
 import {
   Alert,
@@ -144,8 +144,8 @@ const addUser = async () => {
 
     <div class="relative z-10 flex flex-col w-full max-w-md items-center">      <!-- Logo -->
       <div class="mb-6 text-center">
-        <img :src="logoImg" alt="ComfyMind" class="mx-auto h-16 w-16 mb-2" />
-        <h1 class="text-2xl font-bold text-gray-900">ComfyMind</h1>
+        <img :src="logoImg" alt="ComfyMind" class="mx-auto h-32 w-32 mb-2" />
+        <h1 style="font-family: 'Nunito', sans-serif; font-size: 2.2rem; font-weight: 800; color: rgb(17, 24, 39)">ComfyMind</h1>
       </div>
 
       <!-- Card de signup -->

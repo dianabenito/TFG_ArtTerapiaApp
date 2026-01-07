@@ -1,6 +1,6 @@
 import axios from '@/plugins/axios'
 
-const API_URL = 'http://192.168.1.37:8000' // tu backend FastAPI
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const comfyService = {
 

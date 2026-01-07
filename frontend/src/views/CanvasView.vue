@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/alert-dialog'
 
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const WS_URL = API_URL.replace(/^http/, 'ws')
 const route = useRoute()
 const router = useRouter()
 
@@ -84,7 +86,7 @@ const setupSessionEndWatcher = (sessionInfo) => {
 const connectWs = (sessionId, role, sessionInfo) => {
   const token = localStorage.getItem('token')
   if (!token || !sessionId || sessionInfo?.ended_at) return
-  ws = new WebSocket(`ws://192.168.1.37:8000/ws/${sessionId}/${role}?token=${token}`)
+  ws = new WebSocket(`${WS_URL}/ws/${sessionId}/${role}?token=${token}`)
   ws.onmessage = (ev) => {
     try {
       const obj = JSON.parse(ev.data)

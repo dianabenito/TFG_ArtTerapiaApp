@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import ChatPanel from '@/components/ChatPanel.vue'
 import { comfyService } from '../api/comfyService'
 import { userService } from '../api/userService.js'
@@ -39,7 +39,7 @@ import ImagesModal from '@/components/ImagesModal.vue'
 import DrawModal from '@/components/DrawModal.vue'
 import DrawnGallery from '@/components/DrawnGallery.vue'
 import MultiImageModal from '@/components/MultiImageModal.vue'
-import { FolderOpen, Brush, Send, PenTool, ImageIcon, Layers, Loader2, Info, HelpCircle, PanelRightClose, MessageCircle } from 'lucide-vue-next'
+import { FolderOpen, Brush, Send, Type, ImageIcon, Layers, Loader2, Info, HelpCircle, PanelRightClose, MessageCircle } from 'lucide-vue-next'
 
 import { useDateHelpers } from '@/lib/useDateHelpers'
 
@@ -48,7 +48,8 @@ const {
   formatLocalDate
 } = useDateHelpers()
 
-const API_URL = 'http://192.168.1.37:8000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const WS_URL = API_URL.replace(/^http/, 'ws')
 const route = useRoute()
 const router = useRouter()
 const sessionId = Number(route.params.sessionId) // tomado de la ruta si está; será NaN si falta
@@ -56,6 +57,7 @@ const hasSession = Number.isFinite(sessionId)
 
 const chatMessages = ref([])       
 const newChatMessage = ref('')     
+const chatMessagesContainer = ref<HTMLElement | null>(null)
 const role = 'patient'
 
 const prompt = ref({ promptText: '', seed: null, inputImage: null })
@@ -141,7 +143,7 @@ const connectWs = () => {
   }
 
   // incluir token en query param para que el servidor lo valide
-  ws = new WebSocket(`ws://192.168.1.37:8000/ws/${sessionId}/${role}?token=${token}`)
+  ws = new WebSocket(`${WS_URL}/ws/${sessionId}/${role}?token=${token}`)
 
   ws.onopen = () => console.log('WS conectado como paciente')
   ws.onmessage = (ev) => {
@@ -328,10 +330,33 @@ onMounted(async () => {
   setupSessionEndWatcher()
 })
 
+// Función helper para scroll automático al final del chat
+const scrollChatToBottom = async () => {
+  if (!chatMessagesContainer.value) return
+    await nextTick()
+    setTimeout(() => {
+      chatMessagesContainer.value?.scrollTo({
+        top: chatMessagesContainer.value.scrollHeight,
+        behavior: 'smooth'
+      })
+    }, 100)
+}
+
 // persist local state when key pieces change (solo con sessionId)
 watch(imageUrl, persistState)
 watch(showFinalView, persistState)
-watch(chatMessages, persistState, { deep: true })
+watch(chatMessages, () => {
+  persistState()
+  // Auto-scroll al final cuando llegan nuevos mensajes
+  scrollChatToBottom()
+}, { deep: true })
+
+// Auto-scroll cuando se abre el chat
+watch(chatOpen, async (newVal) => {
+  if (newVal) {
+    scrollChatToBottom()
+  }
+})
 
 onBeforeUnmount(() => {
   if (sessionEndTimeout) clearTimeout(sessionEndTimeout)
@@ -1146,7 +1171,7 @@ const convertDrawnSketch = async () => {
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openRefineModal">
             <CardContent class="p-6 flex flex-col items-center text-center gap-3">
-              <PenTool class="h-8 w-8" />
+              <Type class="h-8 w-8" />
               <h3 class="font-semibold">Desde texto</h3>
               <p class="text-sm text-muted-foreground">
                 Describe una idea y conviértela en una obra visual
@@ -1352,7 +1377,7 @@ const convertDrawnSketch = async () => {
     />
   
 
-    <template v-if="!showFinalView">
+    <template v-if="!showFinalView && hasSession">
       <!-- BOTÓN PARA ABRIR/CERRAR CHAT -->
       <div 
         class="fixed z-[60] transition-all duration-300"
@@ -1391,7 +1416,7 @@ const convertDrawnSketch = async () => {
         </div>
 
         <!-- MENSAJES -->
-        <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        <div ref="chatMessagesContainer" class="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           <div
             v-for="(msg, i) in chatMessages"
             :key="i"

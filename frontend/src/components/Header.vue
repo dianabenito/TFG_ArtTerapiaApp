@@ -25,6 +25,7 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 
 import mainBg from '@/assets/utils/fondo_app.jpg'
+import logoImg from '/logo_comfymind.svg'
 import { sessionsService } from '../api/sessionsService.js'
 import { userService } from '../api/userService.js'
 
@@ -136,7 +137,7 @@ onMounted(async () => {
       <Sidebar class="bg-white">
         <SidebarContent>
           <SidebarGroup class="!mb-0 !pb-0">
-            <SidebarGroupLabel>ComfyMind</SidebarGroupLabel>
+            <SidebarGroupLabel>Menú principal</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem v-for="item in items" :key="item.title">
@@ -226,6 +227,10 @@ onMounted(async () => {
             <div class="flex items-center gap-4">
               <SidebarTrigger class="text-gray-700" />
               <Separator orientation="vertical" class="!h-4 hidden sm:block" />
+              <div class="flex items-center gap-2">
+                <img :src="logoImg" alt="ComfyMind" class="h-8 w-8" />
+                <span class="text-gray-900 hidden sm:block mt-1 ml-0.5" style="font-family: 'Nunito', sans-serif; font-size: 1.7rem; font-weight: 750">ComfyMind</span>
+              </div>
             </div>
 
             <!-- PROFILE DROPDOWN -->

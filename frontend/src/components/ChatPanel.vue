@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Send } from 'lucide-vue-next'
@@ -26,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const newMessage = ref('')
+const messagesContainer = ref<HTMLElement | null>(null)
 
 const resolvedOtherUser = computed(() => props.otherUser ?? props.therapistUser ?? null)
 
@@ -66,6 +67,25 @@ const handleSend = () => {
   emit('send', t)
   newMessage.value = ''
 }
+
+const scrollToBottom = async () => {
+  await nextTick()
+  if (messagesContainer.value) {
+    messagesContainer.value.scrollTo({
+      top: messagesContainer.value.scrollHeight,
+      behavior: 'smooth'
+    })
+  }
+}
+
+onMounted(async () => {
+  // Si ya hay mensajes al montar, scrollear al final
+  if (props.messages.length > 0) {
+    await scrollToBottom()
+  }
+})
+
+watch(() => props.messages, scrollToBottom, { deep: true })
 </script>
 
 <template>
@@ -76,7 +96,7 @@ const handleSend = () => {
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-blue-50/50 min-h-0">
+    <div ref="messagesContainer" class="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-blue-50/50 min-h-0">
       <div
         v-for="(msg, i) in messages"
         :key="i"
