@@ -23,7 +23,7 @@ const emit = defineEmits<{
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
       <DialogHeader>
-        <DialogTitle>Generar obra a partir de un prompt de texto</DialogTitle>
+        <DialogTitle>Genera tu obra a partir de una descripción</DialogTitle>
         <DialogDescription>
           Describe la obra que quieres crear y genera una imagen basada en tu descripción.
         </DialogDescription>

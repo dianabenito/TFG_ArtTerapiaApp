@@ -656,6 +656,11 @@ const convertGalleryImage = async () => {
   await generateImage(null, tempImageUrl.value)
 }
 
+const selectGalleryImageDirectly = () => {
+  if (!selectedGalleryImageName.value) return
+  tempImageUrl.value = getImageUrl(selectedGalleryImageName.value)
+}
+
 const openDrawModal = async () => {
   prompt.value.promptText = ''
   chatOpen.value = false
@@ -1012,7 +1017,7 @@ const convertDrawnSketch = async () => {
     >
       <DialogContent class="max-w-3xl sm:max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Instrucciones para tu sesión de Arteterapia</DialogTitle>
+          <DialogTitle>Instrucciones para tu sesión de arteterapia</DialogTitle>
           <DialogDescription class="leading-relaxed mt-2">
             En esta aplicación de generación de imágenes asistida por IA, podréis explorar diversos métodos innovadores 
             de creación artística como parte de vuestra sesión de arteterapia. A continuación, se detallan algunas indicaciones 
@@ -1097,7 +1102,7 @@ const convertDrawnSketch = async () => {
           <!-- TEXTO IZQUIERDA -->
           <div class="space-y-1">
             <h1 class="text-2xl font-semibold text-slate-900">
-              Genera tu obra de Arteterapia
+              Genera tu obra de arteterapia
             </h1>
             <p class="text-sm text-slate-600">
               Explora distintas formas de creación a partir de texto, imágenes o bocetos.
@@ -1298,6 +1303,7 @@ const convertDrawnSketch = async () => {
       @uploadImage="uploadUserImageandAddText"
       @openGallery="openGalleryModal"
       @convert="convertGalleryImage"
+      @selectGalleryImage="selectGalleryImageDirectly"
       @confirm="modalImagesConfirm"
     />
 

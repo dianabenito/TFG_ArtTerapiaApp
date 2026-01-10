@@ -313,6 +313,7 @@ const calendarOptions = ref({
   eventClick: null,
   firstDay: 1,
   height: 'auto',
+  fixedWeekCount: false,
     customButtons: {
     customCreateButton: {
       text: 'Crear nueva sesión',

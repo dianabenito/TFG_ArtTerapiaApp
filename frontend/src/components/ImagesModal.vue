@@ -24,6 +24,7 @@ const emit = defineEmits<{
   (e: 'openGallery'): void
   (e: 'convert'): void
   (e: 'confirm'): void
+  (e: 'selectGalleryImage'): void
 }>()
 
 const onFile = (ev: Event) => {
@@ -37,7 +38,7 @@ const onFile = (ev: Event) => {
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
       <DialogHeader>
-        <DialogTitle>Generar obra a partir de una imagen de entrada y un prompt de texto</DialogTitle>
+        <DialogTitle>Genera tu obra a partir de una imagen de entrada</DialogTitle>
         <DialogDescription>
           Sube una imagen desde tu biblioteca o selecciona una imagen existente de la galería, y añade una descripción para transformar la imagen en una nueva obra.
         </DialogDescription>
@@ -95,7 +96,8 @@ const onFile = (ev: Event) => {
                 <Textarea id="promptText" :model-value="promptText" placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
               </div>
 
-              <div class="flex justify-end mt-3">
+              <div class="flex justify-end gap-2 mt-3">
+                <Button v-if="selectedGalleryImageName" variant="outline" class="px-4 py-2" @click="emit('selectGalleryImage')" :disabled="loading">Usar imagen sin convertir</Button>
                 <Button v-if="selectedGalleryImageName" variant="default" class="px-4 py-2" @click="emit('convert')" :disabled="loading || !promptText?.trim()">{{ loading ? 'Generando...' : 'Convertir la imagen con texto' }}</Button>
               </div>
             </TabsContent>

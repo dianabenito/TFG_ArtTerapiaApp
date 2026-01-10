@@ -41,7 +41,7 @@ const onFile = (ev: Event) => {
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
       <DialogHeader>
-        <DialogTitle>Generar obra a partir de un esbozo</DialogTitle>
+        <DialogTitle>Genera tu obra a partir de un esbozo</DialogTitle>
         <DialogDescription>
           Sube un esbozo desde tu biblioteca o dibújalo en el editor, y añade una descripción para transformar el esbozo en una nueva obra.
         </DialogDescription>

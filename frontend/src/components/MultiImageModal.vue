@@ -52,9 +52,11 @@ const onFile = (ev: Event) => {
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const activeTab = ref('templates')
 const onFileAndUpload = (ev: Event) => {
   onFile(ev)
   emit('uploadImage')
+  activeTab.value = 'uploaded'
 }
 </script>
 
@@ -62,7 +64,7 @@ const onFileAndUpload = (ev: Event) => {
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogContent class="w-full max-w-5xl sm:max-w-5xl max-h-[90vh] overflow-y-auto">
       <DialogHeader class="pb-2">
-        <DialogTitle>Mezclar imágenes para crear una nueva obra</DialogTitle>
+        <DialogTitle>Genera tu obra a partir de la combinación de imágenes</DialogTitle>
         <DialogDescription>
           Selecciona entre {{ minMultiSelect }} y {{ maxMultiSelect }} imágenes de tu galería para combinarlas en una nueva obra.
         </DialogDescription>
@@ -72,7 +74,7 @@ const onFileAndUpload = (ev: Event) => {
         <!-- GALERÍA CON SELECCIÓN MÚLTIPLE Y TABS -->
         <div class="flex flex-col gap-3">
           
-          <Tabs default-value="templates" class="w-full">
+          <Tabs v-model="activeTab" class="w-full">
             <div class="flex items-center justify-between gap-2">
               <TabsList class="w-auto">
                 <TabsTrigger value="templates" class="px-3">Plantillas</TabsTrigger>
