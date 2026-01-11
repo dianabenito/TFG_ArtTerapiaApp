@@ -43,8 +43,11 @@
           </dl>
 
           <div class="mt-4 flex justify-end gap-2">
-            <Button class="bg-cyan-600" v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
+            <Button class="bg-emerald-600" v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
               Ir a sesión activa
+            </Button>
+            <Button class="bg-cyan-600" v-if="selectedSession.ended_at" @click="router.push(`/session/${selectedSession.id}`)">
+              Ir al registro de la sesión
             </Button>
             <Button v-if="user?.type==='therapist' && canModify(selectedSession)" variant="destructive" @click="eliminarSesion(selectedSession.id)">
               Cancelar sesión
