@@ -49,7 +49,6 @@ def main():
     ensure_tables()
     db = SessionLocal()
     try:
-        print('Creando usuarios de prueba...')
         p1 = get_or_create_user(db, models.Patient, 'patient1@example.com', 'P@ssword1', 'Paciente Uno')
         p2 = get_or_create_user(db, models.Patient, 'patient2@example.com', 'P@ssword2', 'Paciente Dos')
         p3 = get_or_create_user(db, models.Patient, 'patient3@example.com', 'P@ssword3', 'Paciente Tres')
@@ -58,8 +57,6 @@ def main():
         t3 = get_or_create_user(db, models.Therapist, 'therapist3@example.com', 'T@ssword3', 'Terapeuta Tres')
         t4 = get_or_create_user(db, models.Therapist, 'therapist4@example.com', 'T@ssword4', 'Terapeuta Cuatro')
 
-        print(f'Usuarios: p1={p1.id}, p2={p2.id}, t1={t1.id}, t2={t2.id}')
-
         now = datetime.utcnow()
         active_start = now - timedelta(minutes=10)
         active_end = now + timedelta(hours=1)
@@ -67,18 +64,10 @@ def main():
         future_start = now + timedelta(days=1)
         future_end = future_start + timedelta(hours=2)
 
-        print('Creando sesiones de prueba...')
         s1 = create_session(db, p1.id, t1.id, active_start, active_end)
         s2 = create_session(db, p2.id, t2.id, future_start, future_end)
         s3 = create_session(db, p3.id, t3.id, active_start, active_end)
 
-        print(f'Sesiones: active={s1.id} (patient {s1.patient_id} - therapist {s1.therapist_id}), future={s2.id}')
-        print('Hecho. Usuarios y sesiones creados / verificados.')
-        print('Credenciales de prueba:')
-        print('  patient1@example.com / P@ssword1 (paciente)')
-        print('  patient2@example.com / P@ssword2 (paciente)')
-        print('  therapist1@example.com / T@ssword1 (terapeuta)')
-        print('  therapist2@example.com / T@ssword2 (terapeuta)')
     finally:
         db.close()
 

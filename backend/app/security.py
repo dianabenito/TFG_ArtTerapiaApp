@@ -1,15 +1,18 @@
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import os
+from dotenv import load_dotenv
+load_dotenv()
 import hashlib
 import logging
 import bcrypt
 
 _log = logging.getLogger(__name__)
 
-SECRET_KEY = "supersecretkey123456"
+SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
 
 def _prehash_bytes(password: str) -> bytes:
@@ -45,10 +48,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 def decode_access_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
+        user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        return user_id
+        return int(user_id)
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token or expired")
-    

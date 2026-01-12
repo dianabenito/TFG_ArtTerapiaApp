@@ -45,6 +45,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
             await websocket.close(code=1008)
             return
 
+        # Si la sesión está finalizada, cerrar el WebSocket
         if getattr(session, "ended_at", None) is not None:
             await websocket.close(code=1008)
             return

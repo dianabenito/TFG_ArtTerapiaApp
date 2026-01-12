@@ -1,11 +1,19 @@
-import axios from 'axios'
+import axios from '@/plugins/axios'
 
-const API_URL = 'http://127.0.0.1:8000' // tu backend FastAPI
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const sessionsService = {
   async getActiveSession() {
     const token = localStorage.getItem('token')
     const response = await axios.get(`${API_URL}/sessions/active`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  async getNextSession() {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/sessions/next`, { 
       headers: { Authorization: `Bearer ${token}` }
     })
     return response.data
@@ -65,6 +73,22 @@ export const sessionsService = {
       sessionData,
       { headers: { Authorization: `Bearer ${token}` } }
     )
+    return response.data
+  },
+
+  async getImagesForSession(sessionId) {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/sessions/sessions/${sessionId}/images`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return response.data
+  },
+
+  async getImagesNoSession(userId) {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/users/users/${userId}/free-images`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     return response.data
   }
 

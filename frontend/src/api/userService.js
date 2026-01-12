@@ -1,10 +1,18 @@
-import axios from 'axios'
+import axios from '@/plugins/axios'
 
-const API_URL = 'http://127.0.0.1:8000' // tu backend FastAPI
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const userService = {
   async getUsers() {
     const response = await axios.get(`${API_URL}/users/users/`)
+    return response.data
+  },
+
+  async getUserById(userId) {
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`${API_URL}/users/users/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     return response.data
   },
 

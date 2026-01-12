@@ -32,7 +32,8 @@ def test_list_and_get_user(client):
     # find seeded patient
     user = next((u for u in arr if u['email'] == 'patient@example.com'), None)
     assert user is not None
-    r = client.get(f"/users/users/{user['id']}")
+    headers = {"Authorization": f"Bearer {client.patient_token}"}
+    r = client.get(f"/users/users/{user['id']}", headers=headers)
     assert r.status_code == 200
     fetched = r.json()
     assert fetched['email'] == 'patient@example.com'

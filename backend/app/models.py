@@ -59,8 +59,8 @@ class Session(Base):
     therapist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # Period during which the session is active
-    start_date = Column(DateTime(timezone=True), nullable=True)
-    end_date = Column(DateTime(timezone=True), nullable=True)
+    start_date = Column(DateTime(timezone=True), nullable=False)
+    end_date = Column(DateTime(timezone=True), nullable=False)
     # Real end timestamp set when the therapist finalizes the session
     ended_at = Column(DateTime(timezone=True), nullable=True)
 

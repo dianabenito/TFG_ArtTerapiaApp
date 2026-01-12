@@ -50,7 +50,7 @@ class ImagenHandler(FileSystemEventHandler):
     def on_created(self, event):
         nombre = os.path.basename(event.src_path)
         if nombre.startswith(self.prefijo) and nombre.lower().endswith((".png", ".jpg", ".jpeg")):
-            print(f"✅ Imagen detectada: {nombre}")
+            print(f"Imagen detectada: {nombre}")
             origen = event.src_path
 
             # Esperar a que el archivo esté completamente escrito
@@ -73,7 +73,7 @@ class ImagenHandler(FileSystemEventHandler):
 
             # Copiar la imagen
             shutil.copyfile(origen, destino)
-            print(f"📂 Imagen copiada a: {destino}")
+            print(f"Imagen copiada a: {destino}")
             self.archivo_encontrado = destino
 
 
@@ -94,7 +94,7 @@ def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
     observer.schedule(handler, CARPETA_ORIGEN, recursive=False)
     observer.start()
 
-    print(f"⏳ Esperando imagen con prefijo '{prefijo}' en {CARPETA_ORIGEN}...")
+    print(f"Esperando imagen con prefijo '{prefijo}' en {CARPETA_ORIGEN}...")  # Ya está en español
 
     start_time = time.time()
     while time.time() - start_time < timeout:
@@ -106,11 +106,11 @@ def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
 
     observer.stop()
     observer.join()
-    print("❌ Tiempo de espera agotado.")
+    print("Tiempo de espera agotado.")
     return None
 
 
-def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_img: Optional[str] = None) -> dict:
+def generar_imagen(prompt_text: str, user_id: int, prompt_seed: Optional[int] = None, input_img: Optional[str] = None) -> dict:
     """
     Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
     
@@ -123,38 +123,54 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
     Raises:
         HTTPException: Si hay un error al generar la imagen
     """
+
+    translator= Translator(from_lang="es", to_lang="en")
+    prompt_text = translator.translate(prompt_text)
     
     if(input_img):
         with open(WORKFLOW_IMG2IMG_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
-            workflow["17"]["inputs"]["text_positive"] = prompt_text
+            workflow["17"]["inputs"]["text_positive"] = prompt_text + ", " +  workflow["17"]["inputs"]["text_positive"]
     else:
         with open(WORKFLOW_TXT2IMG_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
-            workflow["11"]["inputs"]["text_positive"] = prompt_text
+            workflow["11"]["inputs"]["text_positive"] = prompt_text + ", " +  workflow["11"]["inputs"]["text_positive"] 
 
     if(prompt_seed):
         seed = prompt_seed
     else:
         seed = random.randint(0, MAX_SQLITE_INT)
-    
-    translator= Translator(from_lang="es", to_lang="en")
-    prompt_text = translator.translate(prompt_text)
 
     if(input_img):
         filename = input_img.rpartition('/')[-1]
-        print(f"Using input image: {filename}")
+        print(f"Usando imagen de entrada: {filename}")
 
         origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
 
-        print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+        # Validar que el archivo de origen exista
+        if not origin_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"La imagen de entrada no existe: {filename}"
+            )
+
+        print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
         destino_path = CARPETA_COMFY_INPUT / filename
-        shutil.copy(origin_path, destino_path)
+        
+        try:
+            shutil.copy(origin_path, destino_path)
+        except (IOError, OSError) as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error al copiar la imagen de entrada: {str(e)}"
+            )
             
         workflow["10"]["inputs"]["image"] = filename
 
     workflow["3"]["inputs"]["seed"] = seed
-    workflow["9"]["inputs"]["filename_prefix"] = "generated"
+
+    prefix = "generated" + str(user_id)    
+    workflow["9"]["inputs"]["filename_prefix"] = prefix
 
     # Enviar petición a ComfyUI
     payload = {"prompt": workflow}
@@ -169,11 +185,11 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
         )
 
     # Esperar a que se genere la imagen
-    ruta_imagen = esperar_imagen("generated")
+    ruta_imagen = esperar_imagen(prefix)
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
-        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,
@@ -188,28 +204,44 @@ def generar_imagen(prompt_text: str, prompt_seed: Optional[int] = None, input_im
     
 
 
-def convertir_boceto_imagen(input_img: str, input_text: str) -> dict:
+def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> dict:
     with open(WORKFLOW_SKETCH2IMG_PATH, "r",encoding="utf-8") as f:
             workflow = json.load(f)
 
     seed = random.randint(0, MAX_SQLITE_INT)
 
     filename = input_img.rpartition('/')[-1]
-    print(f"Using input image: {filename}")
+    print(f"Usando imagen de entrada: {filename}")
 
     origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
 
-    print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+    # Validar que el archivo de origen exista
+    if not origin_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"La imagen de boceto no existe: {filename}"
+        )
+
+    print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
     destino_path = CARPETA_COMFY_INPUT / filename
-    shutil.copy(origin_path, destino_path)
+    
+    try:
+        shutil.copy(origin_path, destino_path)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al copiar la imagen de boceto: {str(e)}"
+        )
 
     translator= Translator(from_lang="es", to_lang="en")
     input_text = translator.translate(input_text)
 
-    workflow["199"]["inputs"]["text_positive"] = input_text 
+    workflow["199"]["inputs"]["text_positive"] = input_text + ", " + workflow["199"]["inputs"]["text_positive"]
     workflow["138"]["inputs"]["image"] = filename
     workflow["128"]["inputs"]["seed"] = seed
-    workflow["132"]["inputs"]["filename_prefix"] = "generated"
+
+    prefix = "generated" + str(user_id)
+    workflow["132"]["inputs"]["filename_prefix"] = prefix
 
     # Enviar petición a ComfyUI
     payload = {"prompt": workflow}
@@ -224,11 +256,11 @@ def convertir_boceto_imagen(input_img: str, input_text: str) -> dict:
         )
 
     # Esperar a que se genere la imagen
-    ruta_imagen = esperar_imagen("generated")
+    ruta_imagen = esperar_imagen(prefix)
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
-        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,
@@ -242,49 +274,149 @@ def convertir_boceto_imagen(input_img: str, input_text: str) -> dict:
         )
 
 
-def publicar_imagen(upload_file):
-    os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
+def publicar_imagen(upload_file, isDrawn):
+    # Validar tipo de archivo
+    original_name = getattr(upload_file, 'filename', 'upload')
+    ext = os.path.splitext(original_name)[1].lower()
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Extensiones permitidas: {', '.join(allowed_extensions)}"
+        )
+    
+    # Leer contenido del archivo
+    file_content = upload_file.file.read()
+    
+    # Validar tamaño del archivo (máximo 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB en bytes
+    if len(file_content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo es demasiado grande. Tamaño máximo: 10MB"
+        )
+    
+    if len(file_content) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo está vacío"
+        )
+    
+    try:
+        os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear directorio de destino: {str(e)}"
+        )
 
     # create unique filename to avoid collisions
-    original_name = getattr(upload_file, 'filename', 'upload')
-    ext = os.path.splitext(original_name)[1] or '.png'
-    filename = f"uploaded_{uuid.uuid4().hex}{ext}"
+    if not ext:
+        ext = '.png'
+
+    if isDrawn:
+        filename = f"uploaded_drawn_{uuid.uuid4().hex}{ext}"
+    else:
+        filename = f"uploaded_image_{uuid.uuid4().hex}{ext}"
     destino_path = CARPETA_DESTINO_UPL / filename
 
     # write file contents
-    with open(destino_path, 'wb') as f:
-        f.write(upload_file.file.read())
+    try:
+        with open(destino_path, 'wb') as f:
+            f.write(file_content)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al guardar la imagen: {str(e)}"
+        )
 
     return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
 
 
 def publicar_dibujo(upload_file):
     """Save a drawn image into the drawn_images folder and return metadata."""
-    os.makedirs(str(CARPETA_DESTINO_DRAWN), exist_ok=True)
-
+    # Validar tipo de archivo
     original_name = getattr(upload_file, 'filename', 'drawn')
-    ext = os.path.splitext(original_name)[1] or '.png'
+    ext = os.path.splitext(original_name)[1].lower()
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    
+    if ext and ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Extensiones permitidas: {', '.join(allowed_extensions)}"
+        )
+    
+    # Leer contenido del archivo
+    file_content = upload_file.file.read()
+    
+    # Validar tamaño del archivo (máximo 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB en bytes
+    if len(file_content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo es demasiado grande. Tamaño máximo: 10MB"
+        )
+    
+    if len(file_content) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo está vacío"
+        )
+    
+    try:
+        os.makedirs(str(CARPETA_DESTINO_DRAWN), exist_ok=True)
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear directorio de destino: {str(e)}"
+        )
+
+    if not ext:
+        ext = '.png'
     filename = f"drawn_{uuid.uuid4().hex}{ext}"
     destino_path = CARPETA_DESTINO_DRAWN / filename
 
     # write file contents
-    with open(destino_path, 'wb') as f:
-        f.write(upload_file.file.read())
+    try:
+        with open(destino_path, 'wb') as f:
+            f.write(file_content)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al guardar el dibujo: {str(e)}"
+        )
 
     return {"message": "Dibujo guardado correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
 
 def obtener_imagenes_plantilla():
     try:
+        if not os.path.exists(CARPETA_TEMPLATES):
+            raise HTTPException(
+                status_code=404,
+                detail="El directorio de plantillas no existe"
+            )
+        
         files = [
             f for f in os.listdir(CARPETA_TEMPLATES)
             if os.path.isfile(os.path.join(CARPETA_TEMPLATES, f))
         ]
         return {"images": files}
+    except HTTPException:
+        raise
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al leer directorio de plantillas: {str(e)}"
+        )
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error inesperado al obtener plantillas: {str(e)}"
+        )
     
 
-def generate_image_by_mult_images(images: list, count: int) -> dict:
+def generate_image_by_mult_images(images: list, count: int, user_id: int) -> dict:
     """
     Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
     
@@ -317,7 +449,7 @@ def generate_image_by_mult_images(images: list, count: int) -> dict:
 
     for i in range(count):
         filename = images[i].fileName
-        print(f"Using input image: {filename}")
+        print(f"Usando imagen de entrada: {filename}")
         
         file_name = urlparse(images[i].fileName).path.lstrip("/")
 
@@ -330,7 +462,7 @@ def generate_image_by_mult_images(images: list, count: int) -> dict:
 
         origin_path = folder / file_name
 
-        print(f"Copying from {origin_path} to {CARPETA_COMFY_INPUT}")
+        print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
         destino_path = CARPETA_COMFY_INPUT / filename
         shutil.copy(origin_path, destino_path)
         
@@ -339,7 +471,9 @@ def generate_image_by_mult_images(images: list, count: int) -> dict:
     seed = random.randint(0, MAX_SQLITE_INT)
 
     workflow["16"]["inputs"]["seed"] = seed
-    workflow["17"]["inputs"]["filename_prefix"] = "generated"
+
+    prefix = "generated" + str(user_id)
+    workflow["17"]["inputs"]["filename_prefix"] = prefix
 
     # Enviar petición a ComfyUI
     payload = {"prompt": workflow}
@@ -354,11 +488,11 @@ def generate_image_by_mult_images(images: list, count: int) -> dict:
         )
 
     # Esperar a que se genere la imagen
-    ruta_imagen = esperar_imagen("generated")
+    ruta_imagen = esperar_imagen(prefix)
     
     if ruta_imagen:
         nombre_archivo = os.path.basename(ruta_imagen)
-        print(f"✅ Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
         return {
             "message": "Imagen generada correctamente",
             "file": nombre_archivo,
@@ -370,29 +504,3 @@ def generate_image_by_mult_images(images: list, count: int) -> dict:
             status_code=408,
             detail="No se encontró la imagen generada. Tiempo de espera agotado."
         )
-
-
-def publicar_imagen(upload_file):
-    os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
-
-    # create unique filename to avoid collisions
-    original_name = getattr(upload_file, 'filename', 'upload')
-    ext = os.path.splitext(original_name)[1] or '.png'
-    filename = f"uploaded_{uuid.uuid4().hex}{ext}"
-    destino_path = CARPETA_DESTINO_UPL / filename
-
-    # write file contents
-    with open(destino_path, 'wb') as f:
-        f.write(upload_file.file.read())
-
-    return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
-
-def obtener_imagenes_plantilla():
-    try:
-        files = [
-            f for f in os.listdir(CARPETA_TEMPLATES)
-            if os.path.isfile(os.path.join(CARPETA_TEMPLATES, f))
-        ]
-        return {"images": files}
-    except Exception as e:
-        return {"error": str(e)}

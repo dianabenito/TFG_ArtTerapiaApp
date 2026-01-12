@@ -16,6 +16,7 @@ import app.models as models
 import app.dependencies as dependencies
 import app.crud as crud
 import app.schemas as schemas
+import app.security as security
 from datetime import datetime, timedelta
 
 
@@ -40,7 +41,7 @@ def override_get_db():
 
 
 @pytest.fixture(scope="session")
-def initialized_app():
+def client():
     # create tables
     models.Base.metadata.create_all(bind=engine)
     # override dependency
@@ -51,7 +52,7 @@ def initialized_app():
         ws_module.SessionLocal = TestingSessionLocal
     except Exception:
         pass
-    client = TestClient(main.app)
+    test_client = TestClient(main.app)
 
     # create sample users and a session
     db = TestingSessionLocal()
@@ -62,13 +63,18 @@ def initialized_app():
         patient = crud.user.create_user(db, patient_in)
         therapist = crud.user.create_user(db, therapist_in)
 
+        # Generate JWT tokens for test users
+        patient_token = security.create_access_token(data={"sub": str(patient.id), "user_type": patient.type})
+        therapist_token = security.create_access_token(data={"sub": str(therapist.id), "user_type": therapist.type})
+        
+        # Store tokens in the test_client for easy access
+        test_client.patient_token = patient_token
+        test_client.therapist_token = therapist_token
+        test_client.patient_id = patient.id
+        test_client.therapist_id = therapist.id
+
         # Do not create a default session here; tests create sessions as needed to keep isolation
     finally:
         db.close()
 
-    yield client
-
-
-@pytest.fixture()
-def client(initialized_app):
-    return initialized_app
+    yield test_client
