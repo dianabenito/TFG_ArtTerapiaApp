@@ -214,7 +214,7 @@ const handleSessionCreated = async () => {
           @click="() =>
             router.push('/generation')"
         >
-          Ir a la generación libre
+          Acceder a la generación libre
         </Button>
 
         <!-- NO HAY SESIÓN - TERAPEUTA -->

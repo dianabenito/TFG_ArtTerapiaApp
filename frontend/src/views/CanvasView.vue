@@ -37,8 +37,6 @@ const color = ref('#000000')
 const size = ref([5])
 const mode = ref<'draw' | 'erase'>('draw')
 const savedImage = ref<string | null>(null)
-const showConfirmModal = ref(false)
-const promptText = ref('')
 const modalLoading = ref(false)
 const sessionId = ref<number | null>(null)
 const history = ref<string[]>([])
@@ -156,6 +154,8 @@ onMounted(async () => {
       // Fondo blanco para poder guardar
       ctx.value.fillStyle = '#FFFFFF'
       ctx.value.fillRect(0, 0, canvas.value.width, canvas.value.height)
+      // Inicializar hasDrawn en false
+      hasDrawn.value = false
       // Guardar estado inicial
       saveToHistory()
     }
@@ -175,7 +175,6 @@ onBeforeUnmount(() => {
 
 const startDrawing = (e: MouseEvent) => {
   drawing.value = true
-  hasDrawn.value = false
   if (ctx.value) {
     ctx.value.beginPath()
     ctx.value.moveTo(e.offsetX, e.offsetY)
@@ -202,14 +201,9 @@ const stopDrawing = () => {
     saveToHistory()
   }
   drawing.value = false
-  hasDrawn.value = false
   if (ctx.value) {
     ctx.value.closePath()
   }
-}
-
-const openConfirmModal = () => {
-  showConfirmModal.value = true
 }
 
 const saveToHistory = () => {
@@ -258,6 +252,7 @@ const clearCanvas = () => {
   ctx.value.fillRect(0, 0, canvas.value.width, canvas.value.height)
   // Limpiar historial y guardar nuevo estado inicial
   history.value = []
+  hasDrawn.value = false
   saveToHistory()
   toast.success('Lienzo limpiado')
 }
@@ -273,6 +268,14 @@ const setDraw = () => {
 const saveImage = () => {
   if (!canvas.value) return
   savedImage.value = canvas.value.toDataURL('image/png')
+}
+
+const confirmSketch = async () => {
+  if (modalLoading.value || !hasDrawn.value) return
+  modalLoading.value = true
+  saveImage()
+  await uploadSavedImage()
+  modalLoading.value = false
 }
 
 const uploadSavedImage = async () => {
@@ -302,7 +305,7 @@ const uploadSavedImage = async () => {
     const resp = await comfyService.uploadDrawnImage(file, active_user.id)
     const fname = resp.file
     
-    // Preserve session context when navigating back
+    // Volver a la vista de generación con el boceto guardado
     if (sessionId.value) {
       router.push({ 
         path: `/session/${sessionId.value}/patient`, 
@@ -316,16 +319,6 @@ const uploadSavedImage = async () => {
     console.error('Error uploading drawn image', e)
     toast.error('Error subiendo el dibujo: ' + detail)
   }
-}
-
-const modalConfirm = async () => {
-  if (modalLoading.value) return
-  modalLoading.value = true
-  localStorage.setItem('prompt', promptText.value)
-  saveImage()
-  await uploadSavedImage()
-  modalLoading.value = false
-  showConfirmModal.value = false
 }
 
 </script>
@@ -398,11 +391,13 @@ const modalConfirm = async () => {
               </Button>
               
               <Button 
-                @click="openConfirmModal" 
+                @click="confirmSketch" 
                 class="w-full bg-green-600 hover:bg-green-700"
+                :disabled="modalLoading || !hasDrawn"
               >
-                <Wand2 class="h-4 w-4 mr-2" />
-                Transformar boceto
+                <Loader2 v-if="modalLoading" class="h-4 w-4 mr-2 animate-spin" />
+                <Wand2 v-else class="h-4 w-4 mr-2" />
+                Confirmar boceto
               </Button>
             </div>
           </CardContent>
@@ -425,50 +420,6 @@ const modalConfirm = async () => {
         </Card>
       </div>
     </div>
-
-    <!-- CONFIRM MODAL -->
-    <Dialog :open="showConfirmModal" @update:open="(v) => showConfirmModal = v">
-      <DialogContent class="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Transformar tu boceto</DialogTitle>
-          <DialogDescription>
-            Describe cómo quieres transformar tu boceto en una obra de arte
-          </DialogDescription>
-        </DialogHeader>
-
-        <div class="space-y-4 mt-4">
-          <div class="space-y-2">
-            <Label for="promptText">Descripción de la obra</Label>
-            <Textarea 
-              id="promptText"
-              v-model="promptText" 
-              placeholder="Describe cómo quieres que se transforme tu boceto..."
-              class="min-h-[120px]"
-              :disabled="modalLoading"
-            />
-          </div>
-
-          <div class="flex justify-end gap-3 pt-4">
-            <Button 
-              variant="outline" 
-              @click="showConfirmModal = false"
-              :disabled="modalLoading"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              @click="modalConfirm" 
-              :disabled="!promptText || modalLoading"
-              class="bg-green-600 hover:bg-green-700"
-            >
-              <Loader2 v-if="modalLoading" class="h-4 w-4 mr-2 animate-spin" />
-              <Wand2 v-else class="h-4 w-4 mr-2" />
-              Confirmar transformación
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
 
     <AlertDialog :open="showAccessDeniedAlert" @update:open="(val) => showAccessDeniedAlert = val">
       <AlertDialogContent>

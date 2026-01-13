@@ -16,6 +16,7 @@ const props = defineProps<{
   isLoadingGallery: boolean
   uploadFileName?: string | null
   selectedGallerySketchName?: string | null
+  drawnSketchName?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   (e: 'drawSketch'): void
   (e: 'confirm'): void
   (e: 'convertDrawnSketch'): void
+  (e: 'convertDrawnSketchFromCanvas'): void
 }>()
 
 const onFile = (ev: Event) => {
@@ -41,64 +43,50 @@ const onFile = (ev: Event) => {
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogContent class="w-full max-w-5xl sm:max-w-5xl">
       <DialogHeader>
-        <DialogTitle>Genera tu obra a partir de un esbozo</DialogTitle>
+        <DialogTitle>Genera tu obra a partir de un boceto</DialogTitle>
         <DialogDescription>
-          Sube un esbozo desde tu biblioteca o dibújalo en el editor, y añade una descripción para transformar el esbozo en una nueva obra.
+          Dibuja un boceto en el editor, súbelo desde tu biblioteca o escógelo de la galería; y añade una descripción para transformarlo en una nueva obra.
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 mt-4">
         <div class="flex flex-col gap-4">
-          <Tabs :model-value="activeTab" @update:model-value="(v) => emit('update:activeTab', v as string)">
+          <Tabs :model-value="activeTab" @update:model-value="(v) => !loading && emit('update:activeTab', v as string)">
             <TabsList class="mx-auto mb-3">
-              <TabsTrigger value="upload">Subir boceto</TabsTrigger>
-              <TabsTrigger value="draw">Dibujar boceto</TabsTrigger>
-              <TabsTrigger value="gallery">Escoger de la galería</TabsTrigger>
+              <TabsTrigger value="draw" :disabled="loading">Dibujar boceto</TabsTrigger>
+              <TabsTrigger value="upload" :disabled="loading">Subir boceto</TabsTrigger>
+              <TabsTrigger value="gallery" :disabled="loading">Escoger de la galería</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="upload">
-              <div class="grid gap-2 mb-3">
-                <Label for="fileInput">Paso 1: Sube un boceto desde la biblioteca de archivos de tu ordenador:</Label>
-                <div class="flex items-center gap-3">
-                  <div class="relative shrink-0">
-                    <input id="fileInput" type="file" accept="image/*" @change="onFile" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                    <Button variant="outline">
-                      <FolderOpen class="h-4 w-4" />
-                      <span>Seleccionar archivo</span>
-                    </Button>
-                  </div>
-                  <span class="text-sm text-muted-foreground truncate max-w-xs">{{ uploadFileName || 'Ningún archivo seleccionado' }}</span>
-                </div>
-              </div>
-
-              <div class="h-px bg-border my-4" />
-
-              <div class="grid gap-2">
-                <Label for="promptText">Paso 2: Describe la obra que quieres crear a partir del boceto subido:</Label>
-                <Textarea id="promptText" :model-value="promptText" placeholder="Describe tu boceto en detalle para reconvertirlo en una obra final." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
-              </div>
-
-              <div class="flex justify-end mt-3">
-                <Button @click="emit('uploadAndTransform')" :disabled="isLoadingGallery || loading || !uploadFileName || !promptText?.trim()" variant="default">{{ loading ? 'Generando...' : 'Transformar boceto' }}</Button>
-              </div>
-            </TabsContent>
 
             <TabsContent value="draw">
               <div class="grid gap-2">
-                <Label for="promptText">Diseña un nuevo boceto en el editor:</Label>
+                <Label>Paso 1: Diseña un boceto en el editor:</Label>
+                <div class="flex items-center gap-3">
+                  <Button variant="default" class="px-4 py-2" @click="emit('drawSketch')" :disabled="loading || isLoadingGallery">
+                    <Brush class="h-4 w-4" />
+                    {{ drawnSketchName ? 'Dibujar otro boceto' : 'Dibujar un boceto' }}
+                  </Button>
+                  <span v-if="drawnSketchName" class="text-sm text-muted-foreground truncate max-w-xs">{{ drawnSketchName }}</span>
+                  <span v-else class="text-sm text-muted-foreground">Ningún boceto dibujado</span>
+                </div>
               </div>
-              <div class="flex justify-start mt-3">
-                <Button variant="default" class="px-4 py-2" @click="emit('drawSketch')" :disabled="loading || isLoadingGallery">
-                  <Brush class="h-4 w-4" />
-                  Ir a dibujar boceto
-                </Button>
+
+              <div class="h-px bg-border my-4" v-if="drawnSketchName" />
+
+              <div class="grid gap-2" v-if="drawnSketchName">
+                <Label for="promptText">Paso 2: Describe la obra que quieres crear a partir del boceto dibujado:</Label>
+                <Textarea id="promptText" :model-value="promptText" placeholder="Describe tu boceto en detalle para transformarlo en una obra final." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
+              </div>
+
+              <div class="flex justify-end mt-3" v-if="drawnSketchName">
+                <Button variant="default" class="px-4 py-2" @click="emit('convertDrawnSketchFromCanvas')" :disabled="loading || !promptText?.trim()">{{ loading ? 'Generando...' : 'Transformar boceto' }}</Button>
               </div>
             </TabsContent>
             <TabsContent value="gallery">
               <div class="grid gap-2">
                 <Label>Paso 1: Escoge un boceto de la galería de bocetos:</Label>
                 <div class="flex items-center gap-3">
-                  <Button variant="default" class="px-4 py-2 w-fit mt-1" @click="emit('openDrawnGallery')" :disabled="isLoadingGallery">Ver galería</Button>
+                  <Button variant="default" class="px-4 py-2 w-fit mt-1" @click="emit('openDrawnGallery')" :disabled="isLoadingGallery || loading">Ver galería</Button>
                   <span v-if="selectedGallerySketchName" class="text-sm text-muted-foreground truncate max-w-xs">{{ selectedGallerySketchName }}</span>
                   <span v-else class="text-sm text-muted-foreground">Ningún boceto seleccionado</span>
                 </div>
@@ -107,14 +95,42 @@ const onFile = (ev: Event) => {
               <div class="h-px bg-border my-4" v-if="selectedGallerySketchName" />
 
               <div class="grid gap-2" v-if="selectedGallerySketchName">
-                <Label for="promptText" class="leading-normal">Paso 2: Describe la obra que quieres crear a partir de la imagen seleccionada:</Label>
+                <Label for="promptText" class="leading-normal">Paso 2: Describe la obra que quieres crear a partir del boceto seleccionado:</Label>
                 <Textarea id="promptText" :model-value="promptText" placeholder="Describe el contenido del texto que quieres añadir a tu imagen de partida." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
               </div>
 
               <div class="flex justify-end mt-3">
-                <Button v-if="selectedGallerySketchName" variant="default" class="px-4 py-2" @click="emit('convertDrawnSketch')" :disabled="loading || !promptText?.trim()">{{ loading ? 'Generando...' : 'Convertir la imagen con texto' }}</Button>
+                <Button v-if="selectedGallerySketchName" variant="default" class="px-4 py-2" @click="emit('convertDrawnSketch')" :disabled="loading || !promptText?.trim()">{{ loading ? 'Generando...' : 'Transformar boceto' }}</Button>
               </div>
             </TabsContent>
+
+            <TabsContent value="upload">
+              <div class="grid gap-2 mb-3">
+                <Label for="fileInput">Paso 1: Sube un boceto desde la biblioteca de archivos de tu ordenador:</Label>
+                <div class="flex items-center gap-3">
+                  <div class="relative shrink-0">
+                    <input id="fileInput" type="file" accept="image/*" @change="onFile" :disabled="loading" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    <Button variant="outline" :disabled="loading">
+                      <FolderOpen class="h-4 w-4" />
+                      <span>Seleccionar archivo</span>
+                    </Button>
+                  </div>
+                  <span class="text-sm text-muted-foreground truncate max-w-xs">{{ uploadFileName || 'Ningún archivo seleccionado' }}</span>
+                </div>
+              </div>
+
+              <div class="h-px bg-border my-4" v-if="uploadFileName"/>
+
+              <div class="grid gap-2" v-if="uploadFileName">
+                <Label for="promptText">Paso 2: Describe la obra que quieres crear a partir del boceto subido:</Label>
+                <Textarea id="promptText" :model-value="promptText" placeholder="Describe tu boceto en detalle para transformarlo en una obra final." class="min-h-[200px]" :disabled="loading" @update:model-value="(v) => emit('update:promptText', v as string)" />
+              </div>
+
+              <div class="flex justify-end mt-3" v-if="uploadFileName">
+                <Button @click="emit('uploadAndTransform')" :disabled="isLoadingGallery || loading || !uploadFileName || !promptText?.trim()" variant="default">{{ loading ? 'Generando...' : 'Transformar boceto' }}</Button>
+              </div>
+            </TabsContent>
+
             
           </Tabs>
         </div>

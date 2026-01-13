@@ -92,6 +92,20 @@ export const comfyService = {
     // Las imágenes de plantilla pueden seguir siendo públicas si así lo deseas
     const response = await axios.get(`${API_URL}/comfy/template-images`)
     return response.data
+  },
+
+  async linkImageToSession(imageFileName, userId, sessionId) {
+    try {
+      const token = localStorage.getItem('token')
+      const url = `${API_URL}/comfy/users/${userId}/session-images/link?image_file_name=${encodeURIComponent(imageFileName)}&session_id=${sessionId}`
+      const response = await axios.post(url, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return response.data
+    } catch (err) {
+      console.error('linkImageToSession error response:', err?.response?.data || err)
+      throw err
+    }
   }
   
 }

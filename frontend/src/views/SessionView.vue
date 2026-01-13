@@ -204,9 +204,9 @@ const getImageUrl = (fileName) => {
     </Dialog>
 
     <!-- CONTENIDO -->
-    <div class="bg-slate-300/30 min-h-[calc(100vh-4rem)] py-6">
+    <div class="bg-slate-300/30 py-4">
       <!-- ESTE es el contenedor REAL -->
-      <div class="relative mx-auto w-full max-w-3xl px-6 space-y-6">
+      <div class="relative mx-auto w-full max-w-2xl px-4 space-y-4">
 
         <!-- HEADER (sin padding propio) -->
         <div class="flex items-start justify-between gap-4">

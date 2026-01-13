@@ -135,7 +135,7 @@ onMounted(async () => {
   <div class="min-h-screen flex flex-col text-gray-800">
     <SidebarProvider class="flex flex-1">
       <Sidebar class="bg-white">
-        <SidebarContent>
+        <SidebarContent class="overflow-x-hidden">
           <SidebarGroup class="!mb-0 !pb-0">
             <SidebarGroupLabel>Menú principal</SidebarGroupLabel>
             <SidebarGroupContent>
