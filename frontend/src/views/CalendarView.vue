@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto p-4 min-h-[calc(100vh-4rem)] space-y-4 bg-slate-300/30">
+  <div class="mx-auto p-4 space-y-4 bg-slate-300/30">
     <div class="flex flex-wrap items-center justify-between gap-3 px-6">
       <div class="space-y-1">
         <h1 class="text-2xl font-semibold text-slate-900">Calendario</h1>
@@ -10,6 +10,7 @@
 
     <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mx-6">
       <FullCalendar
+        ref="calendarRef"
         :options="calendarOptions"
         @eventClick="handleEventClick"
         class="fc-shadcn"
@@ -43,10 +44,10 @@
           </dl>
 
           <div class="mt-4 flex justify-end gap-2">
-            <Button class="bg-emerald-600" v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
+            <Button class="bg-emerald-600 text-white hover:bg-emerald-700" v-if="isSessionActive(selectedSession)" @click="router.push(`/session/${selectedSession.id}/${user?.type}`)">
               Ir a sesión activa
             </Button>
-            <Button class="bg-cyan-600" v-if="selectedSession.ended_at" @click="router.push(`/session/${selectedSession.id}`)">
+            <Button class="bg-cyan-600 text-white hover:bg-cyan-700" v-if="selectedSession.ended_at" @click="router.push(`/session/${selectedSession.id}`)">
               Ir al registro de la sesión
             </Button>
             <Button v-if="user?.type==='therapist' && canModify(selectedSession)" variant="destructive" @click="eliminarSesion(selectedSession.id)">
@@ -183,13 +184,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, nextTick, onBeforeUnmount } from "vue";
 import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { userService } from '../api/userService';
 import { sessionsService } from '../api/sessionsService';
 import { useRouter } from "vue-router";
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const WS_URL = API_URL.replace(/^http/, 'ws')
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -231,6 +234,7 @@ import CreateSessionModal from '@/components/CreateSessionModal.vue'
 
 const showModal = ref(false)
 const selectedSession = ref(null)
+const calendarRef = ref(null)
 const router = useRouter()
 const loading = ref(true)
 const activeSession = ref(null)
@@ -327,6 +331,54 @@ const calendarOptions = ref({
   },
 })
 
+let calendarWs: WebSocket | null = null
+
+const connectCalendarWs = () => {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    console.warn('No token found, skipping Calendar WS connection')
+    return
+  }
+  if (user.value?.type !== 'patient') {
+    console.log('Usuario no es paciente, saltando WS Calendar')
+    return
+  }
+
+  calendarWs = new WebSocket(`${WS_URL}/ws/home?token=${token}`)
+
+  calendarWs.onopen = () => {
+    console.log('✅ WS Calendar conectado')
+  }
+
+  calendarWs.onmessage = (ev) => {
+    try {
+      const obj = JSON.parse(ev.data)
+      console.log('📨 Mensaje WS Calendar recibido:', obj)
+      if (obj.event === 'new_session') {
+        console.log('🆕 Nueva sesión creada, recargando calendario')
+        loadSessions()
+      }
+    } catch (e) {
+      console.warn('Error parseando WS Calendar:', e)
+    }
+  }
+
+  calendarWs.onclose = () => {
+    console.log('❌ WS Calendar cerrado')
+  }
+
+  calendarWs.onerror = (e) => {
+    console.warn('⚠️ Error en WS Calendar:', e)
+  }
+}
+
+const disconnectCalendarWs = () => {
+  if (calendarWs) {
+    calendarWs.close()
+    calendarWs = null
+  }
+}
+
 onMounted(async () => {
   try {
     user.value = await userService.getCurrentUser()
@@ -349,14 +401,19 @@ onMounted(async () => {
     patients.value = []
   }
   await loadSessions()
-  try {
-    activeSession.value = await sessionsService.getActiveSession()
-  } catch (e) {
-    activeSession.value = null
+  if (user.value?.type === 'patient') {
+    connectCalendarWs()
   }
-  // Rebuild events once we know the active session, so green class applies
-  await loadSessions()
   loading.value = false
+
+  // Force calendar to update size after mount
+  await nextTick()
+  if (calendarRef.value) {
+    const calendarApi = calendarRef.value.getApi()
+    if (calendarApi) {
+      calendarApi.updateSize()
+    }
+  }
 });
 
 async function handleEventClick(info) {
@@ -504,7 +561,13 @@ const handleSessionCreated = async () => {
   showCreateModal.value = false
 }
 
-const loadSessions = async () => {
+async function loadSessions() {
+  try {
+    activeSession.value = await sessionsService.getActiveSession()
+  } catch (e) {
+    activeSession.value = null
+  }
+
   const sessions = await sessionsService.getMySessions();
   const list = Array.isArray(sessions?.data) ? sessions.data : (Array.isArray(sessions) ? sessions : []);
   sessionsList.value = list
@@ -551,6 +614,10 @@ const closeUpdate = () => {
   showUpdateModal.value = false
   selectedSession.value = null
 }
+
+onBeforeUnmount(() => {
+  disconnectCalendarWs()
+})
 
 // ...existing code...
 

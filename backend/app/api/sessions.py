@@ -8,6 +8,7 @@ import app.models as models
 from datetime import datetime
 from sqlalchemy import and_, exists
 from sqlalchemy.orm import aliased
+from app.api.ws import notify_new_session_to_patient
 
 router = APIRouter()
 
@@ -30,7 +31,14 @@ def create_session_for_patient(patient_id: int,
     if session.start_date >= session.end_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="La fecha de inicio debe ser anterior a la fecha de fin")
-    return crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
+    
+    new_session = crud.session.create_session_for_users(db=db, patient_id=patient.id, therapist_id=current_user.id, session=session)
+    
+    # Notificar al paciente si está conectado al WS de Home
+    print(f"[DEBUG] Creada sesión {new_session.id} para paciente {patient_id}. Intentando notificar...")
+    notify_new_session_to_patient(patient_id, new_session.id)
+    
+    return new_session
 
 @router.put("/session/{session_id}", response_model=schemas.Session)
 def update_session(session_id: int, session: schemas.SessionUpdate, db: SessionDep, current_user: CurrentUser):

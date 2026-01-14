@@ -5,18 +5,34 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 export const sessionsService = {
   async getActiveSession() {
     const token = localStorage.getItem('token')
-    const response = await axios.get(`${API_URL}/sessions/active`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    return response.data
+    try {
+      const response = await axios.get(`${API_URL}/sessions/active`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return response.data
+    } catch (error) {
+      // 404 es normal si no hay sesión activa
+      if (error.response?.status === 404) {
+        return null
+      }
+      throw error
+    }
   },
 
   async getNextSession() {
     const token = localStorage.getItem('token')
-    const response = await axios.get(`${API_URL}/sessions/next`, { 
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    return response.data
+    try {
+      const response = await axios.get(`${API_URL}/sessions/next`, { 
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return response.data
+    } catch (error) {
+      // 404 es normal si no hay próxima sesión
+      if (error.response?.status === 404) {
+        return null
+      }
+      throw error
+    }
   },
 
   async endSession(sessionId) {

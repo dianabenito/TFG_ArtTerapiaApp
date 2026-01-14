@@ -124,6 +124,19 @@ const showSessionAlreadyEndedAlert = ref(false)
 const showAccessDeniedAlert = ref(false)
 const activeSession = ref(null)
 
+const closeAllModals = () => {
+  showRefineModal.value = false
+  showImagesModal.value = false
+  showDrawModal.value = false
+  showMultiImageModal.value = false
+  showGallery.value = false
+  showdrawnGallery.value = false
+  showDetails.value = false
+  showInstructions.value = false
+  chatOpen.value = false
+  modalLoading.value = false
+}
+
 let ws = null
 let sessionEndTimeout = null
 
@@ -165,6 +178,7 @@ const connectWs = () => {
         sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
         clearPersistedState()
         ws?.close()
+        closeAllModals()
         // mostrar alert y redirigir al paciente a Home
         showSessionEndedAlert.value = true
         return
@@ -227,6 +241,7 @@ const setupSessionEndWatcher = () => {
 
   // Si la sesión ya está finalizada, muestra el aviso inmediatamente
   if (sessionInfo.value?.ended_at || endDate.getTime() <= now.getTime()) {
+    closeAllModals()
     showSessionAlreadyEndedAlert.value = true
     return
   }
@@ -236,6 +251,7 @@ const setupSessionEndWatcher = () => {
 
   if (msUntilEnd > 0) {
     sessionEndTimeout = setTimeout(() => {
+      closeAllModals()
       showSessionAlreadyEndedAlert.value = true
       // Aquí puedes añadir lógica extra, como cerrar el websocket, redirigir, etc.
     }, msUntilEnd)
@@ -273,6 +289,7 @@ onMounted(async () => {
       sessionInfo.value = await sessionsService.getSession(sessionId)
       // si la sesión ya está finalizada, mostrar alerta y redirigir al home
       if (sessionInfo.value?.ended_at) {
+        closeAllModals()
         showSessionAlreadyEndedAlert.value = true
         return
       }
@@ -360,6 +377,14 @@ watch(chatOpen, async (newVal) => {
   if (newVal) {
     scrollChatToBottom()
   }
+})
+
+watch(showSessionEndedAlert, (val) => {
+  if (val) closeAllModals()
+})
+
+watch(showSessionAlreadyEndedAlert, (val) => {
+  if (val) closeAllModals()
 })
 
 onBeforeUnmount(() => {
@@ -1247,7 +1272,7 @@ const convertDrawnSketchFromCanvas = async () => {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openRefineModal">
-            <CardContent class="p-4 flex flex-col items-center text-center gap-3">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-3">
               <Type class="h-8 w-8" />
               <h3 class="font-semibold">Desde texto</h3>
               <p class="text-sm text-muted-foreground">
@@ -1257,7 +1282,7 @@ const convertDrawnSketchFromCanvas = async () => {
           </Card>
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openSelectImagesModal">
-            <CardContent class="p-4 flex flex-col items-center text-center gap-2">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-2">
               <ImageIcon class="h-8 w-8" />
               <h3 class="font-semibold">Desde imagen</h3>
               <p class="text-sm text-muted-foreground">
@@ -1267,7 +1292,7 @@ const convertDrawnSketchFromCanvas = async () => {
           </Card>
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openDrawModal">
-            <CardContent class="p-4 flex flex-col items-center text-center gap-2">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-2">
               <Brush class="h-8 w-8" />
               <h3 class="font-semibold">Desde boceto</h3>
               <p class="text-sm text-muted-foreground">
@@ -1277,7 +1302,7 @@ const convertDrawnSketchFromCanvas = async () => {
           </Card>
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openGalleryModalMultiselect">
-            <CardContent class="p-4 flex flex-col items-center text-center gap-2">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-2">
               <Layers class="h-8 w-8" />
               <h3 class="font-semibold">Mezcla de imágenes</h3>
               <p class="text-sm text-muted-foreground">
@@ -1303,7 +1328,7 @@ const convertDrawnSketchFromCanvas = async () => {
     </div>
 
     <!-- VISTA FINAL · IMAGEN + CHAT -->
-    <div v-else class="bg-slate-300/30 min-h-[calc(100vh-4rem)]">
+    <div v-else class="bg-slate-300/30">
       <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
         <!-- HEADER -->
         <div class="flex items-start justify-between gap-6">
@@ -1325,12 +1350,12 @@ const convertDrawnSketchFromCanvas = async () => {
         </div>
 
         <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
-          <Card class="min-h-[600px] max-h-[600px] flex flex-col w-full overflow-hidden">
+          <Card class="min-h-[550px] max-h-[550px] flex flex-col w-full overflow-hidden">
             <CardContent class="flex items-center justify-center p-6 w-full h-full">
               <div v-if="imageUrl" class="w-full flex items-center justify-center">
                 <img
                   :src="imageUrl"
-                  class="w-full h-auto max-h-[500px] rounded-xl border shadow-md object-contain bg-white"
+                  class="w-full h-auto max-h-[460px] rounded-xl border shadow-md object-contain bg-white"
                 />
               </div>
               <div v-else class="text-center text-muted-foreground space-y-2">
@@ -1340,13 +1365,16 @@ const convertDrawnSketchFromCanvas = async () => {
             </CardContent>
           </Card>
 
-          <ChatPanel
-            :messages="chatMessages"
-            :role="role"
-            :activeUser="active_user"
-            :therapistUser="therapistUser"
-            @send="(text) => sendChatFromChild(text)"
-          />
+          <div class="h-[550px] max-h-[550px] min-h-0">
+            <ChatPanel
+              class="h-full"
+              :messages="chatMessages"
+              :role="role"
+              :activeUser="active_user"
+              :therapistUser="therapistUser"
+              @send="(text) => sendChatFromChild(text)"
+            />
+          </div>
         </div>
       </div>
     </div>

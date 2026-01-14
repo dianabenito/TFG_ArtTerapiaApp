@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { Calendar, Home, ChevronDown, BookImage, Bookmark, Folder, FileText, Users, Palette  } from 'lucide-vue-next'
 import {
   Sidebar,
@@ -118,6 +118,11 @@ onMounted(async () => {
   } catch (e) {
     user.value = null
   }
+
+  await fetchSessions()
+})
+
+const fetchSessions = async () => {
   try {
     const sessions = await sessionsService.getMySessions()
     const list = Array.isArray((sessions as any)?.data)
@@ -127,7 +132,18 @@ onMounted(async () => {
   } catch (e) {
     mySessions.value = []
   }
-})
+}
+
+watch(
+  () => route.path,
+  (newPath, oldPath) => {
+    const navigatedToHome = newPath.startsWith('/home')
+    const cameFromSession = oldPath?.startsWith('/session/')
+    if (navigatedToHome && cameFromSession) {
+      fetchSessions()
+    }
+  }
+)
 
 </script>
 
