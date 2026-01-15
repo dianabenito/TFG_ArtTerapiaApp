@@ -67,7 +67,14 @@ const connectSocket = () => {
     try {
       const obj = JSON.parse(raw)
       if (obj.event === 'submit_image' && obj.fileName) {
-        const mount = obj.fileName.includes('generated') ? 'generated_images' : 'uploaded_images'
+        let mount 
+        if(obj.fileName.includes('generated')){
+          mount = 'generated_images'
+        } else if(obj.fileName.includes('uploaded')){
+          mount = 'uploaded_images'
+        } else {
+          mount = 'template_images'
+        }
         latestImage.value = `${API_URL}/images/${mount}/${obj.fileName}`
         // No confirmar la obra aún; solo actualizar la imagen
         persistState()
@@ -354,7 +361,7 @@ watch(chatMessages, persistState, { deep: true })
     </Dialog>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <div v-if="sessionInfo && !sessionInfo.ended_at" class="bg-slate-300/30 min-h-[calc(100vh-4rem)]">
+    <div v-if="sessionInfo && !sessionInfo.ended_at" class="bg-slate-300/30">
       <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
         <!-- HEADER -->
         <div class="flex items-start justify-between gap-3">
@@ -382,12 +389,12 @@ watch(chatMessages, persistState, { deep: true })
         <!-- LAYOUT IMAGEN + CHAT -->
         <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
           <!-- IMAGEN -->
-          <Card class="min-h-[600px] max-h-[600px] flex flex-col min-w-[420px]">
-            <CardContent class="flex items-center justify-center p-6">
-              <div v-if="latestImage" class="w-full min-w-[420px]">
+          <Card class="min-h-[550px] max-h-[550px] flex flex-col w-full overflow-hidden">
+            <CardContent class="flex items-center justify-center p-6 w-full h-full">
+              <div v-if="latestImage" class="w-full flex items-center justify-center">
                 <img
                   :src="latestImage"
-                  class="w-full max-h-[70vh] rounded-xl border shadow-md object-contain bg-white"
+                  class="w-full h-auto max-h-[460px] rounded-xl border shadow-md object-contain bg-white"
                 />
               </div>
               <div v-else class="text-center text-muted-foreground space-y-2">
@@ -398,17 +405,19 @@ watch(chatMessages, persistState, { deep: true })
           </Card>
 
           <!-- CHAT -->
-          <ChatPanel
-            class="h-full"
-            :messages="chatMessages"
-            :role="role"
-            :otherUser="patientUser"
-            title="Chat con paciente"
-            selfTone="blue"
-            otherTone="gray"
-            otherLabel="Paciente"
-            @send="(text) => sendChatMessage(text)"
-          />
+          <div class="h-[550px] max-h-[550px] min-h-0">
+            <ChatPanel
+              class="h-full"
+              :messages="chatMessages"
+              :role="role"
+              :otherUser="patientUser"
+              title="Chat con paciente"
+              selfTone="blue"
+              otherTone="gray"
+              otherLabel="Paciente"
+              @send="(text) => sendChatMessage(text)"
+            />
+          </div>
         </div>
 
         <!-- BOTÓN FINALIZAR SESIÓN -->

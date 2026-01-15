@@ -1,3 +1,15 @@
+"""Módulo principal de la aplicación FastAPI de arteterapia.
+
+Este módulo configura la aplicación FastAPI principal, incluyendo:
+- Inicialización de la base de datos
+- Configuración de CORS
+- Montaje de archivos estáticos
+- Registro de routers de API
+
+Attributes:
+    app (FastAPI): Instancia principal de la aplicación FastAPI.
+"""
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,11 +23,13 @@ from .database import engine
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title = "App ArtTerapia", 
-    contact = {
+    title="App ArtTerapia",
+    description="API REST para aplicación de arteterapia con generación de imágenes mediante IA",
+    version="1.0.0",
+    contact={
         "name": "Diana Benito",
         "email": "dbenitre56@alumnes.ub.edu",
-    }, 
+    },
 )
 
 # Configuración de CORS
@@ -37,6 +51,15 @@ app.include_router(comfy.router, prefix="/comfy", tags=["comfy"])
 app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 app.include_router(ws.router, tags=["websocket"])
 
-@app.get("/")
+@app.get("/", tags=["root"])
 async def root():
+    """Endpoint raíz de la API.
+    
+    Returns:
+        dict: Mensaje de bienvenida.
+    
+    Example:
+        >>> GET /
+        {"message": "Hello World"}
+    """
     return {"message": "Hello World"}

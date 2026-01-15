@@ -158,7 +158,7 @@ const addUser = async () => {
         </CardHeader>
 
         <CardContent>
-          <form @submit.prevent="addUser" class="space-y-4" @keydown.enter="addUser">
+          <form @submit.prevent="addUser" class="space-y-4" @keydown.enter="addUser" autocomplete="off">
             <!-- Email field -->
             <div class="flex flex-col space-y-1.5">
               <Label for="email">Correo electrónico</Label>

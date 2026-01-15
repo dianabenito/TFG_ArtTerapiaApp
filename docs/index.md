@@ -1,17 +1,37 @@
-# Welcome to MkDocs
+# ComfyMind - Documentación Técnica
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+Bienvenido a la documentación técnica de **ComfyMind**, una aplicación de art terapia que integra inteligencia artificial generativa.
 
-## Commands
+## Descripción
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+ComfyMind es una aplicación web que combina Vue.js (frontend) y FastAPI (backend) para proporcionar sesiones de art terapia asistidas por IA, permitiendo a usuarios generar y manipular imágenes usando Stable Diffusion XL mediante ComfyUI.
 
-## Project layout
+## Stack Tecnológico
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+### Backend
+- **Framework**: FastAPI
+- **ORM**: SQLAlchemy
+- **Autenticación**: JWT
+- **Base de datos**: SQLite (desarrollo) / PostgreSQL (producción)
+- **IA**: ComfyUI (Stable Diffusion XL)
+
+### Frontend
+- **Framework**: Vue.js 3
+- **Build Tool**: Vite
+- **UI**: Shadcn/ui + TailwindCSS
+- **HTTP**: Axios
+- **Estado**: Pinia
+
+## Navegación
+
+- **Backend**: Modelos, esquemas, operaciones CRUD y endpoints API
+- **Frontend**: Servicios HTTP, componentes Vue y vistas principales
+
+## Enlaces
+
+- **Repositorio**: [GitHub](https://github.com/dianabenito/TFG_ArtTerapiaApp)
+- **Memoria del proyecto**: [Documento Word]
+
+---
+
+*Generado automáticamente desde docstrings del código fuente*

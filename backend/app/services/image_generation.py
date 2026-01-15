@@ -1,3 +1,21 @@
+"""Servicio de generación de imágenes con ComfyUI.
+
+Integración con ComfyUI para generar imágenes usando workflows de Stable Diffusion XL.
+Maneja la comunicación con la API de ComfyUI, monitoreo de archivos generados,
+y gestión de imágenes en el sistema de archivos.
+
+Attributes:
+    CARPETA_ORIGEN (str): Carpeta donde ComfyUI genera las imágenes.
+    CARPETA_DESTINO_GEN (Path): Carpeta destino para imágenes generadas.
+    CARPETA_DESTINO_UPL (Path): Carpeta destino para imágenes subidas.
+    CARPETA_TEMPLATES (Path): Carpeta con imágenes plantilla.
+    CARPETA_DESTINO_DRAWN (Path): Carpeta destino para dibujos de canvas.
+    CARPETA_COMFY_INPUT (Path): Carpeta input de ComfyUI.
+    WORKFLOW_*_PATH (Path): Rutas a archivos de workflow JSON.
+    COMFYUI_URL (str): URL de la API de ComfyUI.
+    MAX_SQLITE_INT (int): Valor máximo para seeds de SQLite.
+"""
+
 from fileinput import filename
 import random
 from urllib.parse import urlparse
@@ -15,12 +33,9 @@ import uuid
 from pathlib import Path
 from translate import Translator
 
-# Carpeta externa donde se generan las imágenes
 CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output"
 
-# Obtener la ruta base del proyecto (backend/)
 BASE_DIR = Path(__file__).parent.parent.parent
-# Carpeta de destino dentro del proyecto
 CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
 CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
 CARPETA_TEMPLATES = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "template_images"
@@ -28,7 +43,6 @@ CARPETA_DESTINO_DRAWN = BASE_DIR.parent / "frontend" / "src" / "assets" / "image
 
 CARPETA_COMFY_INPUT = Path(r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input")
 
-# Ruta del workflow.json
 WORKFLOW_TXT2IMG_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
 WORKFLOW_IMG2IMG_PATH = BASE_DIR / "workflows" / "sdxl img2img api workflow.json"
 WORKFLOW_MULTIMG2_PATH = BASE_DIR / "workflows" / "sdxl twoimgs2img api workflow.json"
@@ -36,14 +50,23 @@ WORKFLOW_MULTIMG3_PATH = BASE_DIR / "workflows" / "sdxl threeimgs2img api workfl
 WORKFLOW_MULTIMG4_PATH = BASE_DIR / "workflows" / "sdxl fourimgs2img api workflow.json"
 WORKFLOW_SKETCH2IMG_PATH = BASE_DIR / "workflows" / "sdxl sketch2img api workflow.json"
 
-# URL de ComfyUI
 COMFYUI_URL = "http://127.0.0.1:8188/prompt"
 
 MAX_SQLITE_INT = 9223372036854775807
 
 class ImagenHandler(FileSystemEventHandler):
-    """Handler para detectar cuando se crea una nueva imagen en ComfyUI"""
+    """Handler de watchdog para detectar imágenes generadas por ComfyUI.
+    
+    Attributes:
+        prefijo (str): Prefijo del nombre de archivo a detectar.
+        archivo_encontrado (str | None): Nombre del archivo detectado.
+    """
     def __init__(self, prefijo):
+        """Inicializa el handler.
+        
+        Args:
+            prefijo (str): Prefijo del nombre de archivo a monitorear.
+        """
         self.prefijo = prefijo
         self.archivo_encontrado = None
 

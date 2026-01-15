@@ -74,12 +74,12 @@ const onFileAndUpload = (ev: Event) => {
         <!-- GALERÍA CON SELECCIÓN MÚLTIPLE Y TABS -->
         <div class="flex flex-col gap-3">
           
-          <Tabs v-model="activeTab" class="w-full">
+          <Tabs v-model="activeTab" @update:model-value="(v) => !loading && (activeTab = v)" class="w-full">
             <div class="flex items-center justify-between gap-2">
               <TabsList class="w-auto">
-                <TabsTrigger value="templates" class="px-3">Plantillas</TabsTrigger>
-                <TabsTrigger value="generated" class="px-3">Generadas</TabsTrigger>
-                <TabsTrigger value="uploaded" class="px-3">Subidas</TabsTrigger>
+                <TabsTrigger value="templates" :disabled="loading" class="px-3">Plantillas</TabsTrigger>
+                <TabsTrigger value="generated" :disabled="loading" class="px-3">Generadas</TabsTrigger>
+                <TabsTrigger value="uploaded" :disabled="loading" class="px-3">Subidas</TabsTrigger>
               </TabsList>
               <div class="flex items-center gap-2">
                 <input
@@ -87,6 +87,7 @@ const onFileAndUpload = (ev: Event) => {
                   type="file"
                   accept="image/*"
                   class="sr-only"
+                  :disabled="loading"
                   @change="onFileAndUpload"
                 />
                 <Button
@@ -108,9 +109,12 @@ const onFileAndUpload = (ev: Event) => {
                 <div
                   v-for="img in templates"
                   :key="img.fileName"
-                  class="relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all hover:shadow-md aspect-square"
-                  :class="isSelected(img) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent'"
-                  @click="emit('toggle', img)"
+                  class="relative rounded-lg overflow-hidden border-2 transition-all hover:shadow-md aspect-square"
+                  :class="[
+                    isSelected(img) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent',
+                    loading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  ]"
+                  @click="!loading && emit('toggle', img)"
                 >
                   <img
                     :src="getImageUrl(img.fileName)"
@@ -135,9 +139,12 @@ const onFileAndUpload = (ev: Event) => {
                 <div
                   v-for="img in generated"
                   :key="img.fileName"
-                  class="relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all hover:shadow-md aspect-square"
-                  :class="isSelected(img) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent'"
-                  @click="emit('toggle', img)"
+                  class="relative rounded-lg overflow-hidden border-2 transition-all hover:shadow-md aspect-square"
+                  :class="[
+                    isSelected(img) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent',
+                    loading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  ]"
+                  @click="!loading && emit('toggle', img)"
                 >
                   <img
                     :src="getImageUrl(img.fileName)"
@@ -162,9 +169,12 @@ const onFileAndUpload = (ev: Event) => {
                 <div
                   v-for="img in uploaded"
                   :key="img.fileName"
-                  class="relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all hover:shadow-md aspect-square"
-                  :class="isSelected(img) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent'"
-                  @click="emit('toggle', img)"
+                  class="relative rounded-lg overflow-hidden border-2 transition-all hover:shadow-md aspect-square"
+                  :class="[
+                    isSelected(img) ? 'border-blue-500 ring-2 ring-blue-300' : 'border-transparent',
+                    loading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  ]"
+                  @click="!loading && emit('toggle', img)"
                 >
                   <img
                     :src="getImageUrl(img.fileName)"

@@ -117,7 +117,7 @@ const login = async () => {
       </CardHeader>
 
       <CardContent>
-        <form @submit.prevent="login" @keyup.enter="login" class="space-y-4">
+        <form @submit.prevent="login" @keyup.enter="login" class="space-y-4" autocomplete="off">
           <!-- Email field -->
           <div class="flex flex-col space-y-1.5">
             <Label for="email">Correo electrónico</Label>

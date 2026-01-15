@@ -265,10 +265,17 @@ const handleCreateSession = async () => {
 }
 
 const doCreateSession = async (session_data: { start_date: string; end_date: string }) => {
-  await sessionsService.createSession(formData.value.patientId as number, session_data)
-  toast.success('Sesión creada correctamente')
-  emit('session-created')
-  handleClose()
+  try {
+    console.log('Creando sesión para paciente:', formData.value.patientId, session_data)
+    await sessionsService.createSession(formData.value.patientId as number, session_data)
+    console.log('Sesión creada exitosamente')
+    toast.success('Sesión creada correctamente')
+    emit('session-created')
+    handleClose()
+  } catch (error) {
+    console.error('Error al crear sesión:', error)
+    errorMessage.value = error?.response?.data?.detail || 'Error al crear sesión'
+  }
 }
 
 const confirmOverlap = async () => {

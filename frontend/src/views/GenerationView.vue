@@ -66,6 +66,9 @@ const imageUrl = ref('')
 const tempImageUrl = ref('')
 const seedLastImg = ref(null)
 const uploadFile = ref(null)
+const uploadedImageUrl = ref('') // URL de la imagen ya subida para regeneraciones
+const uploadedSketchUrl = ref('') // URL del boceto ya subido para regeneraciones
+const drawnSketchName = ref('') // Nombre del boceto dibujado
 const selectedGalleryImageName = ref('')
 const selectedGallerySketchName = ref('')
 const active_user = ref(null)          // usuario actual
@@ -121,6 +124,19 @@ const showSessionAlreadyEndedAlert = ref(false)
 const showAccessDeniedAlert = ref(false)
 const activeSession = ref(null)
 
+const closeAllModals = () => {
+  showRefineModal.value = false
+  showImagesModal.value = false
+  showDrawModal.value = false
+  showMultiImageModal.value = false
+  showGallery.value = false
+  showdrawnGallery.value = false
+  showDetails.value = false
+  showInstructions.value = false
+  chatOpen.value = false
+  modalLoading.value = false
+}
+
 let ws = null
 let sessionEndTimeout = null
 
@@ -162,6 +178,7 @@ const connectWs = () => {
         sessionInfo.value = { ...sessionInfo.value, ended_at: new Date().toISOString() }
         clearPersistedState()
         ws?.close()
+        closeAllModals()
         // mostrar alert y redirigir al paciente a Home
         showSessionEndedAlert.value = true
         return
@@ -224,6 +241,7 @@ const setupSessionEndWatcher = () => {
 
   // Si la sesión ya está finalizada, muestra el aviso inmediatamente
   if (sessionInfo.value?.ended_at || endDate.getTime() <= now.getTime()) {
+    closeAllModals()
     showSessionAlreadyEndedAlert.value = true
     return
   }
@@ -233,6 +251,7 @@ const setupSessionEndWatcher = () => {
 
   if (msUntilEnd > 0) {
     sessionEndTimeout = setTimeout(() => {
+      closeAllModals()
       showSessionAlreadyEndedAlert.value = true
       // Aquí puedes añadir lógica extra, como cerrar el websocket, redirigir, etc.
     }, msUntilEnd)
@@ -270,6 +289,7 @@ onMounted(async () => {
       sessionInfo.value = await sessionsService.getSession(sessionId)
       // si la sesión ya está finalizada, mostrar alerta y redirigir al home
       if (sessionInfo.value?.ended_at) {
+        closeAllModals()
         showSessionAlreadyEndedAlert.value = true
         return
       }
@@ -301,20 +321,21 @@ onMounted(async () => {
 
   connectWs()
   await loadGallery()
-  // If navigated from Canvas with a drawn image, show it
+  
+  // Si volvemos del canvas después de dibujar
   const drawn = route.query.image
   if (drawn) {
-    // drawn images are saved under drawn_images
-    showDrawModal.value = true 
-    tempImageUrl.value = `${API_URL}/images/drawn_images/${drawn}`
-    prompt.value.promptText = localStorage.getItem('prompt')
-    localStorage.removeItem('prompt')
-    activeDrawTab.value = 'draw' // Open 'draw' tab since image comes from canvas
-    await createFromSketch(tempImageUrl.value)
-    // refresh gallery to include it (in case DB record exists)
-    try { await loadGallery() } catch (e) { /* ignore */ }
+    // Guardar el nombre del boceto dibujado
+    drawnSketchName.value = String(drawn)
     
-    // Remove 'image' query param to avoid loop
+    // Abrir el modal en la pestaña de dibujar
+    showDrawModal.value = true
+    activeDrawTab.value = 'draw'
+    modalLoading.value = false
+    
+    // Limpiar flags y query param
+    localStorage.removeItem('returnToDrawModal')
+    localStorage.removeItem('returnSessionId')
     router.replace({ query: {} })
   }
 
@@ -358,6 +379,14 @@ watch(chatOpen, async (newVal) => {
   }
 })
 
+watch(showSessionEndedAlert, (val) => {
+  if (val) closeAllModals()
+})
+
+watch(showSessionAlreadyEndedAlert, (val) => {
+  if (val) closeAllModals()
+})
+
 onBeforeUnmount(() => {
   if (sessionEndTimeout) clearTimeout(sessionEndTimeout)
   ws?.close()
@@ -388,12 +417,23 @@ const handleRefineModalClose = (val: boolean) => {
 const handleImagesModalClose = (val: boolean) => {
   if (!val && !modalLoading.value) {
     showImagesModal.value = false
+    // Limpiar al cerrar sin confirmar
+    selectedGalleryImageName.value = ''
+    prompt.value.promptText = ''
+    uploadFile.value = null
+    uploadedImageUrl.value = ''
   }
 }
 
 const handleDrawModalClose = (val: boolean) => {
   if (!val && !modalLoading.value) {
     showDrawModal.value = false
+    // Limpiar al cerrar sin confirmar
+    selectedGallerySketchName.value = ''
+    prompt.value.promptText = ''
+    uploadFile.value = null
+    uploadedSketchUrl.value = ''
+    drawnSketchName.value = ''
   }
 }
 
@@ -524,13 +564,35 @@ const modalTextConfirm = () => {
   persistState()
 }
 
-const modalImagesConfirm = () => {
+const modalImagesConfirm = async () => {
+  // Si se seleccionó una imagen de la galería sin transformar y estamos en sesión, asociarla
+  if (selectedGalleryImageName.value && Number.isFinite(sessionId)) {
+    try {
+      modalLoading.value = true
+      active_user.value = await userService.getCurrentUser()
+      await comfyService.linkImageToSession(selectedGalleryImageName.value, active_user.value.id, sessionId)
+      toast.success('Imagen asociada a la sesión')
+    } catch (e) {
+      toast.error('Error al asociar imagen a la sesión: ' + (e?.response?.data?.detail || e?.message || String(e)))
+      console.error(e)
+      modalLoading.value = false
+      return
+    } finally {
+      modalLoading.value = false
+    }
+  }
+  
   // set main view to modal image and seed
   if (tempImageUrl.value && tempImageUrl.value !== '') {
     imageUrl.value = tempImageUrl.value
     seedLastImg.value = prompt.value.seed
   }
   showImagesModal.value = false
+  // Limpiar después de confirmar
+  selectedGalleryImageName.value = ''
+  prompt.value.promptText = ''
+  uploadFile.value = null
+  uploadedImageUrl.value = ''
   submitImage()
   persistState()
 }
@@ -542,6 +604,12 @@ const modalDrawConfirm = () => {
     seedLastImg.value = prompt.value.seed
   }
   showDrawModal.value = false
+  // Limpiar después de confirmar
+  selectedGallerySketchName.value = ''
+  prompt.value.promptText = ''
+  uploadFile.value = null
+  uploadedSketchUrl.value = ''
+  drawnSketchName.value = ''
   submitImage()
   persistState()
 }
@@ -554,7 +622,12 @@ const onFileChange = (arg: any) => {
   } else {
     f = arg as File
   }
-  if (f) uploadFile.value = f
+  if (f) {
+    uploadFile.value = f
+    // Limpiar las URLs de archivos previamente subidos cuando se selecciona uno nuevo
+    uploadedImageUrl.value = ''
+    uploadedSketchUrl.value = ''
+  }
 }
 
 const uploadUserImage = async () => {
@@ -584,23 +657,29 @@ const uploadUserImage = async () => {
 }
 
 const uploadUserImageandAddText = async () => {
-  if (!uploadFile.value) return toast.warning('Selecciona una imagen primero')
+  if (!uploadFile.value && !uploadedImageUrl.value) return toast.warning('Selecciona una imagen primero')
   try {
     isLoading.value = true
-    active_user.value = await userService.getCurrentUser()
-    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
-    if (resp.file) {
-      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
-      seedLastImg.value = resp.seed
-      toast.success('Imagen subida correctamente')
-      uploadFile.value = null
+    
+    // Si ya tenemos la imagen subida, no volver a subirla
+    if (uploadedImageUrl.value) {
+      await generateImage(null, uploadedImageUrl.value)
+    } else {
+      // Primera vez: subir la imagen
+      active_user.value = await userService.getCurrentUser()
+      const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id)
+      if (resp.file) {
+        uploadedImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+        seedLastImg.value = resp.seed
+        toast.success('Imagen subida correctamente')
 
-      await generateImage(null, tempImageUrl.value)
-      // Refresh gallery to show uploaded image
-      try {
-        await loadGallery()
-      } catch (e) {
-        console.warn('No se pudo recargar la galería tras subir imagen:', e)
+        await generateImage(null, uploadedImageUrl.value)
+        // Refresh gallery to show uploaded image
+        try {
+          await loadGallery()
+        } catch (e) {
+          console.warn('No se pudo recargar la galería tras subir imagen:', e)
+        }
       }
     }
   } catch (e) {
@@ -608,28 +687,34 @@ const uploadUserImageandAddText = async () => {
     console.error(e)
   } finally {
     isLoading.value = false
-    prompt.value.promptText = ''
+    // NO limpiar uploadFile ni promptText para permitir regeneraciones
   }
 }
 
 const uploadAndTransformSketch = async () => {
-  if (!uploadFile.value) return toast.warning('Selecciona una imagen primero')
+  if (!uploadFile.value && !uploadedSketchUrl.value) return toast.warning('Selecciona una imagen primero')
   try {
     isLoading.value = true
-    active_user.value = await userService.getCurrentUser()
-    const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id, true)
-    if (resp.file) {
-      tempImageUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
-      seedLastImg.value = resp.seed
-      toast.success('Imagen subida correctamente')
-      uploadFile.value = null
-      
-      await createFromSketch(tempImageUrl.value)
-      // Refresh gallery to show uploaded image
-      try {
-        await loadGallery()
-      } catch (e) {
-        console.warn('No se pudo recargar la galería tras subir imagen:', e)
+    
+    // Si ya tenemos el boceto subido, no volver a subirlo
+    if (uploadedSketchUrl.value) {
+      await createFromSketch(uploadedSketchUrl.value)
+    } else {
+      // Primera vez: subir el boceto
+      active_user.value = await userService.getCurrentUser()
+      const resp = await comfyService.uploadImage(uploadFile.value, active_user.value.id, true)
+      if (resp.file) {
+        uploadedSketchUrl.value = `${API_URL}/images/uploaded_images/${resp.file}`
+        seedLastImg.value = resp.seed
+        toast.success('Imagen subida correctamente')
+        
+        await createFromSketch(uploadedSketchUrl.value)
+        // Refresh gallery to show uploaded image
+        try {
+          await loadGallery()
+        } catch (e) {
+          console.warn('No se pudo recargar la galería tras subir imagen:', e)
+        }
       }
     }
   } catch (e) {
@@ -637,7 +722,7 @@ const uploadAndTransformSketch = async () => {
     console.error(e)
   } finally {
     isLoading.value = false
-    prompt.value.promptText = ''
+    // NO limpiar uploadFile ni promptText para permitir regeneraciones
   }
 }
 
@@ -646,6 +731,8 @@ const openSelectImagesModal = async () => {
   chatOpen.value = false
   tempImageUrl.value = ''
   selectedGalleryImageName.value = ''
+  uploadFile.value = null
+  uploadedImageUrl.value = ''
   showImagesModal.value = true
   modalLoading.value = false
 }
@@ -667,6 +754,9 @@ const openDrawModal = async () => {
   tempImageUrl.value = ''
   showDrawModal.value = true
   selectedGallerySketchName.value = ''
+  uploadFile.value = null
+  uploadedSketchUrl.value = ''
+  drawnSketchName.value = ''
   modalLoading.value = false
   activeDrawTab.value = 'upload' // Reset to upload tab by default
 }
@@ -933,6 +1023,13 @@ const convertDrawnSketch = async () => {
   await createFromSketch(imageUrl.value)
 }
 
+// Handler para conversión de boceto dibujado
+const convertDrawnSketchFromCanvas = async () => {
+  if (!drawnSketchName.value) return
+  const imageUrl = `${API_URL}/images/drawn_images/${drawnSketchName.value}`
+  await createFromSketch(imageUrl)
+}
+
 </script>
 
 <template>
@@ -1084,7 +1181,7 @@ const convertDrawnSketch = async () => {
       class="transition-all duration-300 bg-slate-300/30"
       :class="chatOpen ? 'mr-80' : 'mr-0'"
     >
-      <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
+      <div class="max-w-7xl mx-auto px-6 py-3 space-y-3">
 
         <!-- OVERLAY DE CARGA -->
         <div
@@ -1136,7 +1233,7 @@ const convertDrawnSketch = async () => {
 
         <Card
           class="transition-all duration-300"
-          :class="imageUrl ? 'min-h-[420px]' : 'min-h-[220px]'"
+          :class="imageUrl ? 'min-h-[360px]' : 'min-h-[300px]'"
         >
           <CardContent class="flex items-center justify-center h-full p-2">
             <div v-if="imageUrl" class="flex flex-col items-center gap-4">
@@ -1160,7 +1257,7 @@ const convertDrawnSketch = async () => {
 
             <div
               v-else
-              class="text-center text-muted-foreground space-y-3"
+              class="text-center text-muted-foreground space-y-3 mt-10"
             >
               <ImageIcon class="h-12 w-12 mx-auto opacity-50" />
               <p class="text-sm">
@@ -1172,10 +1269,10 @@ const convertDrawnSketch = async () => {
         </Card>
 
         <!-- ACCIONES PRINCIPALES -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openRefineModal">
-            <CardContent class="p-6 flex flex-col items-center text-center gap-3">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-3">
               <Type class="h-8 w-8" />
               <h3 class="font-semibold">Desde texto</h3>
               <p class="text-sm text-muted-foreground">
@@ -1185,7 +1282,7 @@ const convertDrawnSketch = async () => {
           </Card>
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openSelectImagesModal">
-            <CardContent class="p-6 flex flex-col items-center text-center gap-3">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-2">
               <ImageIcon class="h-8 w-8" />
               <h3 class="font-semibold">Desde imagen</h3>
               <p class="text-sm text-muted-foreground">
@@ -1195,17 +1292,17 @@ const convertDrawnSketch = async () => {
           </Card>
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openDrawModal">
-            <CardContent class="p-6 flex flex-col items-center text-center gap-3">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-2">
               <Brush class="h-8 w-8" />
               <h3 class="font-semibold">Desde boceto</h3>
               <p class="text-sm text-muted-foreground">
-                Dibuja o sube un boceto inicial para convertirlo en una obra 
+                Dibuja o sube un boceto inicial para transformarlo en una obra final
               </p>
             </CardContent>
           </Card>
 
           <Card class="hover:shadow-lg transition cursor-pointer" @click="openGalleryModalMultiselect">
-            <CardContent class="p-6 flex flex-col items-center text-center gap-3">
+            <CardContent class="py-3 px-4 flex flex-col items-center text-center gap-2">
               <Layers class="h-8 w-8" />
               <h3 class="font-semibold">Mezcla de imágenes</h3>
               <p class="text-sm text-muted-foreground">
@@ -1231,7 +1328,7 @@ const convertDrawnSketch = async () => {
     </div>
 
     <!-- VISTA FINAL · IMAGEN + CHAT -->
-    <div v-else class="bg-slate-300/30 min-h-[calc(100vh-4rem)]">
+    <div v-else class="bg-slate-300/30">
       <div class="max-w-7xl mx-auto px-6 py-4 space-y-4">
         <!-- HEADER -->
         <div class="flex items-start justify-between gap-6">
@@ -1253,12 +1350,12 @@ const convertDrawnSketch = async () => {
         </div>
 
         <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
-          <Card class="min-h-[600px] max-h-[600px] min-w-[420px] flex flex-col">
-            <CardContent class="flex items-center justify-center p-6">
-              <div v-if="imageUrl" class="w-full min-w-[420px]">
+          <Card class="min-h-[550px] max-h-[550px] flex flex-col w-full overflow-hidden">
+            <CardContent class="flex items-center justify-center p-6 w-full h-full">
+              <div v-if="imageUrl" class="w-full flex items-center justify-center">
                 <img
                   :src="imageUrl"
-                  class="w-full max-h-[70vh] rounded-xl border shadow-md object-contain bg-white"
+                  class="w-full h-auto max-h-[460px] rounded-xl border shadow-md object-contain bg-white"
                 />
               </div>
               <div v-else class="text-center text-muted-foreground space-y-2">
@@ -1268,13 +1365,16 @@ const convertDrawnSketch = async () => {
             </CardContent>
           </Card>
 
-          <ChatPanel
-            :messages="chatMessages"
-            :role="role"
-            :activeUser="active_user"
-            :therapistUser="therapistUser"
-            @send="(text) => sendChatFromChild(text)"
-          />
+          <div class="h-[550px] max-h-[550px] min-h-0">
+            <ChatPanel
+              class="h-full"
+              :messages="chatMessages"
+              :role="role"
+              :activeUser="active_user"
+              :therapistUser="therapistUser"
+              @send="(text) => sendChatFromChild(text)"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1316,6 +1416,7 @@ const convertDrawnSketch = async () => {
       :uploadFileName="uploadFile ? uploadFile.name : null"
       v-model:promptText="prompt.promptText"
       :selectedGallerySketchName="selectedGallerySketchName"
+      :drawnSketchName="drawnSketchName"
       @update:open="handleDrawModalClose"
       @update:activeTab="(v) => (activeDrawTab = v)"
       @fileChange="onFileChange"
@@ -1323,6 +1424,7 @@ const convertDrawnSketch = async () => {
       @openDrawnGallery="openDrawnGalleryModal"
       @drawSketch="drawSketch"
       @convertDrawnSketch="convertDrawnSketch"
+      @convertDrawnSketchFromCanvas="convertDrawnSketchFromCanvas"
       @confirm="modalDrawConfirm"
 
 

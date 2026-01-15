@@ -89,7 +89,7 @@ watch(() => props.messages, scrollToBottom, { deep: true })
 </script>
 
 <template>
-  <div class="flex flex-col h-full max-h-[600px] rounded-xl border shadow-lg bg-white rounded-t-xl">
+  <div class="flex flex-col max-h-[600px] rounded-xl border shadow-lg bg-white rounded-t-xl min-h-0">
     <div class="flex items-center justify-between px-4 py-3 border-b rounded-t-xl" style="background-color: rgba(96, 165, 250, 0.6);">
           <div class="flex items-center gap-2 ">
             <h2 class="text-sm font-semibold text-black">{{ title || 'Chat con el terapeuta' }}</h2>
