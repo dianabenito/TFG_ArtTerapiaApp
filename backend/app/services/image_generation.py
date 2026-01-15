@@ -1,0 +1,529 @@
+"""Servicio de generación de imágenes con ComfyUI.
+
+Integración con ComfyUI para generar imágenes usando workflows de Stable Diffusion XL.
+Maneja la comunicación con la API de ComfyUI, monitoreo de archivos generados,
+y gestión de imágenes en el sistema de archivos.
+
+Attributes:
+    CARPETA_ORIGEN (str): Carpeta donde ComfyUI genera las imágenes.
+    CARPETA_DESTINO_GEN (Path): Carpeta destino para imágenes generadas.
+    CARPETA_DESTINO_UPL (Path): Carpeta destino para imágenes subidas.
+    CARPETA_TEMPLATES (Path): Carpeta con imágenes plantilla.
+    CARPETA_DESTINO_DRAWN (Path): Carpeta destino para dibujos de canvas.
+    CARPETA_COMFY_INPUT (Path): Carpeta input de ComfyUI.
+    WORKFLOW_*_PATH (Path): Rutas a archivos de workflow JSON.
+    COMFYUI_URL (str): URL de la API de ComfyUI.
+    MAX_SQLITE_INT (int): Valor máximo para seeds de SQLite.
+"""
+
+from fileinput import filename
+import random
+from urllib.parse import urlparse
+import requests
+import json
+import time
+import os
+import shutil
+from typing import Optional
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from pathlib import Path
+from fastapi import HTTPException
+import uuid
+from pathlib import Path
+from translate import Translator
+
+CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output"
+
+BASE_DIR = Path(__file__).parent.parent.parent
+CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
+CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
+CARPETA_TEMPLATES = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "template_images"
+CARPETA_DESTINO_DRAWN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "drawn_images"
+
+CARPETA_COMFY_INPUT = Path(r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input")
+
+WORKFLOW_TXT2IMG_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
+WORKFLOW_IMG2IMG_PATH = BASE_DIR / "workflows" / "sdxl img2img api workflow.json"
+WORKFLOW_MULTIMG2_PATH = BASE_DIR / "workflows" / "sdxl twoimgs2img api workflow.json"
+WORKFLOW_MULTIMG3_PATH = BASE_DIR / "workflows" / "sdxl threeimgs2img api workflow.json"
+WORKFLOW_MULTIMG4_PATH = BASE_DIR / "workflows" / "sdxl fourimgs2img api workflow.json"
+WORKFLOW_SKETCH2IMG_PATH = BASE_DIR / "workflows" / "sdxl sketch2img api workflow.json"
+
+COMFYUI_URL = "http://127.0.0.1:8188/prompt"
+
+MAX_SQLITE_INT = 9223372036854775807
+
+class ImagenHandler(FileSystemEventHandler):
+    """Handler de watchdog para detectar imágenes generadas por ComfyUI.
+    
+    Attributes:
+        prefijo (str): Prefijo del nombre de archivo a detectar.
+        archivo_encontrado (str | None): Nombre del archivo detectado.
+    """
+    def __init__(self, prefijo):
+        """Inicializa el handler.
+        
+        Args:
+            prefijo (str): Prefijo del nombre de archivo a monitorear.
+        """
+        self.prefijo = prefijo
+        self.archivo_encontrado = None
+
+    def on_created(self, event):
+        nombre = os.path.basename(event.src_path)
+        if nombre.startswith(self.prefijo) and nombre.lower().endswith((".png", ".jpg", ".jpeg")):
+            print(f"Imagen detectada: {nombre}")
+            origen = event.src_path
+
+            # Esperar a que el archivo esté completamente escrito
+            max_wait = 10  # segundos
+            wait_time = 0.1
+            elapsed = 0
+            last_size = -1
+
+            while elapsed < max_wait:
+                current_size = os.path.getsize(origen)
+                if current_size == last_size:
+                    break  # el archivo dejó de crecer
+                last_size = current_size
+                time.sleep(wait_time)
+                elapsed += wait_time
+
+            # Asegurar que la carpeta de destino existe
+            os.makedirs(str(CARPETA_DESTINO_GEN), exist_ok=True)
+            destino = os.path.join(str(CARPETA_DESTINO_GEN), nombre)
+
+            # Copiar la imagen
+            shutil.copyfile(origen, destino)
+            print(f"Imagen copiada a: {destino}")
+            self.archivo_encontrado = destino
+
+
+
+def esperar_imagen(prefijo: str, timeout: int = 500) -> Optional[str]:
+    """
+    Espera a que se genere una imagen con el prefijo especificado.
+    
+    Args:
+        prefijo: Prefijo del nombre de archivo a buscar
+        timeout: Tiempo máximo de espera en segundos
+    
+    Returns:
+        Ruta completa de la imagen generada o None si se agota el tiempo
+    """
+    handler = ImagenHandler(prefijo)
+    observer = Observer()
+    observer.schedule(handler, CARPETA_ORIGEN, recursive=False)
+    observer.start()
+
+    print(f"Esperando imagen con prefijo '{prefijo}' en {CARPETA_ORIGEN}...")  # Ya está en español
+
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if handler.archivo_encontrado:
+            observer.stop()
+            observer.join()
+            return handler.archivo_encontrado
+        time.sleep(0.5)
+
+    observer.stop()
+    observer.join()
+    print("Tiempo de espera agotado.")
+    return None
+
+
+def generar_imagen(prompt_text: str, user_id: int, prompt_seed: Optional[int] = None, input_img: Optional[str] = None) -> dict:
+    """
+    Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
+    
+    Args:
+        prompt_text: Texto del prompt para generar la imagen
+    
+    Returns:
+        Diccionario con la información de la imagen generada
+    
+    Raises:
+        HTTPException: Si hay un error al generar la imagen
+    """
+
+    translator= Translator(from_lang="es", to_lang="en")
+    prompt_text = translator.translate(prompt_text)
+    
+    if(input_img):
+        with open(WORKFLOW_IMG2IMG_PATH, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+            workflow["17"]["inputs"]["text_positive"] = prompt_text + ", " +  workflow["17"]["inputs"]["text_positive"]
+    else:
+        with open(WORKFLOW_TXT2IMG_PATH, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+            workflow["11"]["inputs"]["text_positive"] = prompt_text + ", " +  workflow["11"]["inputs"]["text_positive"] 
+
+    if(prompt_seed):
+        seed = prompt_seed
+    else:
+        seed = random.randint(0, MAX_SQLITE_INT)
+
+    if(input_img):
+        filename = input_img.rpartition('/')[-1]
+        print(f"Usando imagen de entrada: {filename}")
+
+        origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
+
+        # Validar que el archivo de origen exista
+        if not origin_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"La imagen de entrada no existe: {filename}"
+            )
+
+        print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
+        destino_path = CARPETA_COMFY_INPUT / filename
+        
+        try:
+            shutil.copy(origin_path, destino_path)
+        except (IOError, OSError) as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error al copiar la imagen de entrada: {str(e)}"
+            )
+            
+        workflow["10"]["inputs"]["image"] = filename
+
+    workflow["3"]["inputs"]["seed"] = seed
+
+    prefix = "generated" + str(user_id)    
+    workflow["9"]["inputs"]["filename_prefix"] = prefix
+
+    # Enviar petición a ComfyUI
+    payload = {"prompt": workflow}
+    
+    try:
+        response = requests.post(COMFYUI_URL, json=payload, timeout=300)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Error al comunicarse con ComfyUI: {str(e)}"
+        )
+
+    # Esperar a que se genere la imagen
+    ruta_imagen = esperar_imagen(prefix)
+    
+    if ruta_imagen:
+        nombre_archivo = os.path.basename(ruta_imagen)
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        return {
+            "message": "Imagen generada correctamente",
+            "file": nombre_archivo,
+            "fullPath": ruta_imagen,
+            "seed": seed
+        }
+    else:
+        raise HTTPException(
+            status_code=408,
+            detail="No se encontró la imagen generada. Tiempo de espera agotado."
+        )
+    
+
+
+def convertir_boceto_imagen(input_img: str, input_text: str, user_id: int) -> dict:
+    with open(WORKFLOW_SKETCH2IMG_PATH, "r",encoding="utf-8") as f:
+            workflow = json.load(f)
+
+    seed = random.randint(0, MAX_SQLITE_INT)
+
+    filename = input_img.rpartition('/')[-1]
+    print(f"Usando imagen de entrada: {filename}")
+
+    origin_path = BASE_DIR.parent / "frontend" / "src" / "assets" / urlparse(input_img).path.lstrip("/")
+
+    # Validar que el archivo de origen exista
+    if not origin_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"La imagen de boceto no existe: {filename}"
+        )
+
+    print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
+    destino_path = CARPETA_COMFY_INPUT / filename
+    
+    try:
+        shutil.copy(origin_path, destino_path)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al copiar la imagen de boceto: {str(e)}"
+        )
+
+    translator= Translator(from_lang="es", to_lang="en")
+    input_text = translator.translate(input_text)
+
+    workflow["199"]["inputs"]["text_positive"] = input_text + ", " + workflow["199"]["inputs"]["text_positive"]
+    workflow["138"]["inputs"]["image"] = filename
+    workflow["128"]["inputs"]["seed"] = seed
+
+    prefix = "generated" + str(user_id)
+    workflow["132"]["inputs"]["filename_prefix"] = prefix
+
+    # Enviar petición a ComfyUI
+    payload = {"prompt": workflow}
+    
+    try:
+        response = requests.post(COMFYUI_URL, json=payload, timeout=300)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Error al comunicarse con ComfyUI: {str(e)}"
+        )
+
+    # Esperar a que se genere la imagen
+    ruta_imagen = esperar_imagen(prefix)
+    
+    if ruta_imagen:
+        nombre_archivo = os.path.basename(ruta_imagen)
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        return {
+            "message": "Imagen generada correctamente",
+            "file": nombre_archivo,
+            "fullPath": ruta_imagen,
+            "seed": seed
+        }
+    else:
+        raise HTTPException(
+            status_code=408,
+            detail="No se encontró la imagen generada. Tiempo de espera agotado."
+        )
+
+
+def publicar_imagen(upload_file, isDrawn):
+    # Validar tipo de archivo
+    original_name = getattr(upload_file, 'filename', 'upload')
+    ext = os.path.splitext(original_name)[1].lower()
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Extensiones permitidas: {', '.join(allowed_extensions)}"
+        )
+    
+    # Leer contenido del archivo
+    file_content = upload_file.file.read()
+    
+    # Validar tamaño del archivo (máximo 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB en bytes
+    if len(file_content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo es demasiado grande. Tamaño máximo: 10MB"
+        )
+    
+    if len(file_content) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo está vacío"
+        )
+    
+    try:
+        os.makedirs(str(CARPETA_DESTINO_UPL), exist_ok=True)
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear directorio de destino: {str(e)}"
+        )
+
+    # create unique filename to avoid collisions
+    if not ext:
+        ext = '.png'
+
+    if isDrawn:
+        filename = f"uploaded_drawn_{uuid.uuid4().hex}{ext}"
+    else:
+        filename = f"uploaded_image_{uuid.uuid4().hex}{ext}"
+    destino_path = CARPETA_DESTINO_UPL / filename
+
+    # write file contents
+    try:
+        with open(destino_path, 'wb') as f:
+            f.write(file_content)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al guardar la imagen: {str(e)}"
+        )
+
+    return {"message": "Imagen subida correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
+
+
+def publicar_dibujo(upload_file):
+    """Save a drawn image into the drawn_images folder and return metadata."""
+    # Validar tipo de archivo
+    original_name = getattr(upload_file, 'filename', 'drawn')
+    ext = os.path.splitext(original_name)[1].lower()
+    allowed_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+    
+    if ext and ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Extensiones permitidas: {', '.join(allowed_extensions)}"
+        )
+    
+    # Leer contenido del archivo
+    file_content = upload_file.file.read()
+    
+    # Validar tamaño del archivo (máximo 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB en bytes
+    if len(file_content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo es demasiado grande. Tamaño máximo: 10MB"
+        )
+    
+    if len(file_content) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo está vacío"
+        )
+    
+    try:
+        os.makedirs(str(CARPETA_DESTINO_DRAWN), exist_ok=True)
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al crear directorio de destino: {str(e)}"
+        )
+
+    if not ext:
+        ext = '.png'
+    filename = f"drawn_{uuid.uuid4().hex}{ext}"
+    destino_path = CARPETA_DESTINO_DRAWN / filename
+
+    # write file contents
+    try:
+        with open(destino_path, 'wb') as f:
+            f.write(file_content)
+    except (IOError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al guardar el dibujo: {str(e)}"
+        )
+
+    return {"message": "Dibujo guardado correctamente", "file": filename, "fullPath": str(destino_path), "seed": None}
+
+def obtener_imagenes_plantilla():
+    try:
+        if not os.path.exists(CARPETA_TEMPLATES):
+            raise HTTPException(
+                status_code=404,
+                detail="El directorio de plantillas no existe"
+            )
+        
+        files = [
+            f for f in os.listdir(CARPETA_TEMPLATES)
+            if os.path.isfile(os.path.join(CARPETA_TEMPLATES, f))
+        ]
+        return {"images": files}
+    except HTTPException:
+        raise
+    except OSError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al leer directorio de plantillas: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error inesperado al obtener plantillas: {str(e)}"
+        )
+    
+
+def generate_image_by_mult_images(images: list, count: int, user_id: int) -> dict:
+    """
+    Genera una imagen usando ComfyUI basándose en el prompt proporcionado.
+    
+    Args:
+        prompt_text: Texto del prompt para generar la imagen
+    
+    Returns:
+        Diccionario con la información de la imagen generada
+    
+    Raises:
+        HTTPException: Si hay un error al generar la imagen
+    """
+    imgs_idx = []
+
+    if (count == 2):
+        with open(WORKFLOW_MULTIMG2_PATH, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+        imgs_idx  = [1, 2]
+
+    elif (count == 3):
+        with open(WORKFLOW_MULTIMG3_PATH, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+        imgs_idx  = [1, 2, 5]
+
+    elif (count == 4):
+        with open(WORKFLOW_MULTIMG4_PATH, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+        imgs_idx  = [1, 2, 28, 29]
+    
+
+    for i in range(count):
+        filename = images[i].fileName
+        print(f"Usando imagen de entrada: {filename}")
+        
+        file_name = urlparse(images[i].fileName).path.lstrip("/")
+
+        if "generated" in file_name.lower():
+            folder = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
+        elif "uploaded" in file_name.lower():
+            folder = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
+        else:
+            folder = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "template_images"
+
+        origin_path = folder / file_name
+
+        print(f"Copiando de {origin_path} a {CARPETA_COMFY_INPUT}")
+        destino_path = CARPETA_COMFY_INPUT / filename
+        shutil.copy(origin_path, destino_path)
+        
+        workflow[f"{imgs_idx[i]}"]["inputs"]["image"] = filename
+
+    seed = random.randint(0, MAX_SQLITE_INT)
+
+    workflow["16"]["inputs"]["seed"] = seed
+
+    prefix = "generated" + str(user_id)
+    workflow["17"]["inputs"]["filename_prefix"] = prefix
+
+    # Enviar petición a ComfyUI
+    payload = {"prompt": workflow}
+    
+    try:
+        response = requests.post(COMFYUI_URL, json=payload, timeout=300)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Error al comunicarse con ComfyUI: {str(e)}"
+        )
+
+    # Esperar a que se genere la imagen
+    ruta_imagen = esperar_imagen(prefix)
+    
+    if ruta_imagen:
+        nombre_archivo = os.path.basename(ruta_imagen)
+        print(f"Devolviendo ruta de imagen: assets/{nombre_archivo}")
+        return {
+            "message": "Imagen generada correctamente",
+            "file": nombre_archivo,
+            "fullPath": ruta_imagen,
+            "seed": seed
+        }
+    else:
+        raise HTTPException(
+            status_code=408,
+            detail="No se encontró la imagen generada. Tiempo de espera agotado."
+        )

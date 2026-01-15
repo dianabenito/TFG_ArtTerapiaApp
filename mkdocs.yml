@@ -1,0 +1,48 @@
+site_name: ComfyMind - Documentación Técnica
+site_description: Documentación técnica de la aplicación ArtTerapia con IA
+site_url: https://dianabenito.github.io/TFG_ArtTerapiaApp/
+
+theme:
+  name: material
+  language: es
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [backend]
+          options:
+            docstring_style: google
+            show_source: true
+            heading_level: 2
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            
+watch:
+  - backend/app
+
+nav:
+  - Inicio: index.md
+  - Backend:
+      - Modelos: backend/models.md
+      - Esquemas: backend/schemas.md
+      - CRUD: backend/crud.md
+      - Endpoints: backend/endpoints.md
+  - Frontend:
+      - Servicios: frontend/services.md
+      - Componentes: frontend/componentes.md
+      - Vistas: frontend/vistas.md

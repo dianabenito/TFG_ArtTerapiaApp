@@ -1,0 +1,274 @@
+{
+  "128": {
+    "inputs": {
+      "seed": 569102554892694,
+      "steps": 30,
+      "cfg": 6,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": [
+        "157",
+        0
+      ],
+      "positive": [
+        "141",
+        0
+      ],
+      "negative": [
+        "141",
+        1
+      ],
+      "latent_image": [
+        "133",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "129": {
+    "inputs": {
+      "text": [
+        "199",
+        0
+      ],
+      "clip": [
+        "157",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Codificar Texto CLIP (Prompt)"
+    }
+  },
+  "130": {
+    "inputs": {
+      "text": [
+        "199",
+        1
+      ],
+      "clip": [
+        "157",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Codificar Texto CLIP (Prompt)"
+    }
+  },
+  "131": {
+    "inputs": {
+      "samples": [
+        "128",
+        0
+      ],
+      "vae": [
+        "157",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decodificación VAE"
+    }
+  },
+  "132": {
+    "inputs": {
+      "filename_prefix": "Img",
+      "images": [
+        "200",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Final Image"
+    }
+  },
+  "133": {
+    "inputs": {
+      "width": [
+        "198",
+        0
+      ],
+      "height": [
+        "198",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "138": {
+    "inputs": {
+      "image": "7125932.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Cargar Imagen"
+    }
+  },
+  "139": {
+    "inputs": {
+      "preprocessor": "ScribblePreprocessor",
+      "resolution": 1024,
+      "image": [
+        "138",
+        0
+      ]
+    },
+    "class_type": "AIO_Preprocessor",
+    "_meta": {
+      "title": "AIO Aux Preprocessor"
+    }
+  },
+  "140": {
+    "inputs": {
+      "images": [
+        "139",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image from Preprocessor"
+    }
+  },
+  "141": {
+    "inputs": {
+      "strength": 0.9,
+      "start_percent": 0,
+      "end_percent": 0.8,
+      "positive": [
+        "129",
+        0
+      ],
+      "negative": [
+        "130",
+        0
+      ],
+      "control_net": [
+        "142",
+        0
+      ],
+      "image": [
+        "139",
+        0
+      ],
+      "vae": [
+        "157",
+        2
+      ]
+    },
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "Aplicar ControlNet"
+    }
+  },
+  "142": {
+    "inputs": {
+      "control_net_name": "diffusion_pytorch_model_promax.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "Cargar Modelo ControlNet"
+    }
+  },
+  "144": {
+    "inputs": {
+      "text": "1:1",
+      "anything": [
+        "198",
+        2
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Preview Resolution"
+    }
+  },
+  "152": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_afjap_00003_.png&type=temp&subfolder=&rand=0.7050325218395719"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_afjap_00004_.png&type=temp&subfolder=&rand=0.8842066758437302"
+          }
+        ]
+      },
+      "image_a": [
+        "138",
+        0
+      ],
+      "image_b": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "157": {
+    "inputs": {
+      "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Cargar Punto de Control"
+    }
+  },
+  "198": {
+    "inputs": {
+      "resolution": "1024×1024 (1:1) - Native"
+    },
+    "class_type": "FluxResolutionNode",
+    "_meta": {
+      "title": "Flux.1 Dev Resolution"
+    }
+  },
+  "199": {
+    "inputs": {
+      "text_positive": "digital painting, expressive illustration, dreamlike atmosphere, emotional, calm mood, gentle details, artistic illustration, concept art style, not photorealistic, stylized",
+      "text_negative": "ugly, photorealistic, hyperrealistic, ultra realistic, real photo, creepy, uncanny, watermark, horror, gore, sexualized, NSFW, epic, anxiety",
+      "style_file": "basic.yaml",
+      "template_name": "Digital Painting"
+    },
+    "class_type": "iToolsPromptStyler",
+    "_meta": {
+      "title": "iTools Prompt Styler 🖌️"
+    }
+  },
+  "200": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "width": 512,
+      "height": 512,
+      "crop": "disabled",
+      "image": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Ampliar Imagen"
+    }
+  }
+}
