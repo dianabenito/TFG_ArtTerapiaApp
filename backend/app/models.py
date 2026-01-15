@@ -1,3 +1,16 @@
+"""Modelos ORM de SQLAlchemy para la base de datos.
+
+Este módulo define todos los modelos de base de datos utilizando SQLAlchemy ORM:
+- User: Modelo base con herencia de tabla única (STI)
+- Patient: Subtipo de usuario que recibe terapia
+- Therapist: Subtipo de usuario que conduce sesiones
+- Image: Imágenes generadas durante sesiones
+- Session: Sesiones de terapia entre terapeuta y paciente
+
+Note:
+    Se utiliza Single Table Inheritance (STI) para User/Patient/Therapist.
+"""
+
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Text, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func

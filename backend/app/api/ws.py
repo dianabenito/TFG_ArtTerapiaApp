@@ -1,3 +1,16 @@
+"""Router de API para comunicación WebSocket en tiempo real.
+
+Proporciona endpoints WebSocket para:
+- Comunicación bidireccional durante sesiones (chat, notificaciones de imágenes)
+- Notificaciones en Home/Calendar (nuevas sesiones creadas)
+
+Attributes:
+    active_sessions (Dict[int, Dict[str, WebSocket]]): Conexiones activas por sesión.
+        Estructura: {session_id: {"patient": WebSocket, "therapist": WebSocket}}
+    home_ws_connections (Dict[int, WebSocket]): Conexiones Home activas por usuario.
+        Estructura: {user_id: WebSocket}
+"""
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Dict
 from app.security import decode_access_token
@@ -8,22 +21,38 @@ import asyncio
 
 router = APIRouter()
 
-# Diccionario que mantiene conexiones activas por sesión
 active_sessions: Dict[int, Dict[str, WebSocket]] = {}
-
-# Diccionario que mantiene conexiones Home activas por usuario
 home_ws_connections: Dict[int, WebSocket] = {}
 
 
 @router.websocket("/ws/{session_id}/{role}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
-    """
-    WebSocket seguro y bidireccional para paciente y terapeuta.
-    Permite:
-      - envío de imágenes
-      - notificaciones de estado
-      - finalización de sesión
-      - **chat en tiempo real**
+    """WebSocket bidireccional para comunicación en sesiones de terapia.
+    
+    Funcionalidades:
+    - Chat en tiempo real entre paciente y terapeuta
+    - Notificaciones de imágenes generadas
+    - Notificaciones de estado de sesión
+    - Finalización de sesión
+    
+    Args:
+        websocket (WebSocket): Conexión WebSocket.
+        session_id (int): ID de la sesión de terapia.
+        role (str): Rol del usuario ("patient" o "therapist").
+    
+    Query Parameters:
+        token (str): Token JWT para autenticación.
+    
+    Protocol:
+        - Envío/recepción de JSON: {"event": str, "sender": str, "text": str, ...}
+        - Texto plano se convierte automáticamente a mensaje de chat
+    
+    Note:
+        La conexión se cierra si:
+        - No se proporciona token
+        - Token inválido
+        - Usuario no autorizado para la sesión
+        - Sesión ya finalizada (ended_at != None)
     """
 
     # 1. Obtener token del query param
@@ -104,9 +133,22 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int, role: str):
 
 @router.websocket("/ws/home")
 async def websocket_home(websocket: WebSocket):
-    """
-    WebSocket para notificaciones en Home/Calendar.
-    Notifica al paciente cuando el terapeuta crea una nueva sesión.
+    """WebSocket para notificaciones en vista Home/Calendar.
+    
+    Permite notificar a pacientes cuando un terapeuta crea una sesión para ellos.
+    
+    Args:
+        websocket (WebSocket): Conexión WebSocket.
+    
+    Query Parameters:
+        token (str): Token JWT para autenticación.
+    
+    Protocol:
+        - Server → Client: {"event": "new_session", "sessionId": int}
+        - Client → Server: Heartbeat (cualquier texto para mantener conexión)
+    
+    Note:
+        La conexión se cierra si no se proporciona token o es inválido.
     """
     
     # Obtener token del query param
@@ -142,9 +184,18 @@ async def websocket_home(websocket: WebSocket):
 
 
 def notify_new_session_to_patient(patient_id: int, session_id: int):
-    """
-    Notifica a un paciente si está conectado al WS de Home.
-    Se llama cuando el terapeuta crea una sesión para ese paciente.
+    """Notifica a un paciente conectado sobre una nueva sesión creada.
+    
+    Envía notificación WebSocket al paciente si está conectado a /ws/home.
+    Llamado automáticamente cuando un terapeuta crea una sesión.
+    
+    Args:
+        patient_id (int): ID del paciente a notificar.
+        session_id (int): ID de la nueva sesión creada.
+    
+    Note:
+        Si el paciente no está conectado, la notificación se descarta silenciosamente.
+        Utiliza asyncio.create_task para envío asíncrono sin bloquear.
     """
     if patient_id not in home_ws_connections:
         print(f"Paciente {patient_id} no está conectado a Home WS")

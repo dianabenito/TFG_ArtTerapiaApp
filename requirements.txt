@@ -21,3 +21,9 @@ watchdog>=2.1
 bcrypt>=4.0
 translate>=3.6
 Pillow>=9.0
+
+# Documentation
+mkdocs>=1.5
+mkdocs-material>=9.0
+mkdocstrings[python]>=0.24
+mkdocstrings-python>=1.7
