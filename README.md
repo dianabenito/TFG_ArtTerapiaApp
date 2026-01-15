@@ -101,13 +101,17 @@ Copia el fitxer d'exemple:
 copy .env.example .env
 ```
 
-Edita `.env` si cal. Exemple:
+Edita `.env` i ajusta les rutes segons la teva instal·lació de ComfyUI. Exemple:
 ```bash
 SECRET_KEY=supersecretkey123456789
 COMFY_UI_URL=http://localhost:8188
+COMFY_OUTPUT_DIR=C:/Users/YOUR_USERNAME/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output
+COMFY_INPUT_DIR=C:/Users/YOUR_USERNAME/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input
 ```
 
-**Important en producció:** genera una clau `SECRET_KEY` més segura.
+**Important:**
+- **En producció:** genera una clau `SECRET_KEY` més segura.
+- **COMFY_OUTPUT_DIR i COMFY_INPUT_DIR:** han de coincidir amb la ubicació real on tens instal·lat ComfyUI.
 
 ### Frontend (carpeta frontend)
 Copia el fitxer d'exemple:

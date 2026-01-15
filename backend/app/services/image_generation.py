@@ -32,16 +32,20 @@ from fastapi import HTTPException
 import uuid
 from pathlib import Path
 from translate import Translator
+from dotenv import load_dotenv
 
-CARPETA_ORIGEN = r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output"
+# Cargar variables de entorno
+load_dotenv()
+
+# Leer configuración de ComfyUI desde variables de entorno
+CARPETA_ORIGEN = os.getenv("COMFY_OUTPUT_DIR", r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/output")
+CARPETA_COMFY_INPUT = Path(os.getenv("COMFY_INPUT_DIR", r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input"))
 
 BASE_DIR = Path(__file__).parent.parent.parent
 CARPETA_DESTINO_GEN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "generated_images"
 CARPETA_DESTINO_UPL = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "uploaded_images"
 CARPETA_TEMPLATES = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "template_images"
 CARPETA_DESTINO_DRAWN = BASE_DIR.parent / "frontend" / "src" / "assets" / "images" / "drawn_images"
-
-CARPETA_COMFY_INPUT = Path(r"C:/Users/diana/AppData/Local/Programs/ComfyUI for developers/ComfyUI/input")
 
 WORKFLOW_TXT2IMG_PATH = BASE_DIR / "workflows" / "sdxl txt2img api workflow.json"
 WORKFLOW_IMG2IMG_PATH = BASE_DIR / "workflows" / "sdxl img2img api workflow.json"
@@ -50,7 +54,9 @@ WORKFLOW_MULTIMG3_PATH = BASE_DIR / "workflows" / "sdxl threeimgs2img api workfl
 WORKFLOW_MULTIMG4_PATH = BASE_DIR / "workflows" / "sdxl fourimgs2img api workflow.json"
 WORKFLOW_SKETCH2IMG_PATH = BASE_DIR / "workflows" / "sdxl sketch2img api workflow.json"
 
-COMFYUI_URL = "http://127.0.0.1:8188/prompt"
+# Leer URL de ComfyUI desde variable de entorno
+COMFYUI_BASE_URL = os.getenv("COMFY_UI_URL", "http://localhost:8188")
+COMFYUI_URL = f"{COMFYUI_BASE_URL}/prompt"
 
 MAX_SQLITE_INT = 9223372036854775807
 
